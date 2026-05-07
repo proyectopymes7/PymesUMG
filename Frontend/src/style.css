@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fiery-darkred: #780000;
+  --color-fiery-red: #C1121F;
+  --color-fiery-cream: #FDF0D5;
+  --color-fiery-navy: #003049;
+  --color-fiery-blue: #669BBC;
+}
+
+:root {
+  font-family: 'Outfit', sans-serif;
+  color-scheme: light dark;
+  background-color: #FDF0D5;
+  color: #003049;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}
