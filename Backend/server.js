@@ -18,6 +18,7 @@ const sugerenciasRoutes = require('./routes/sugerencias');
 const errorHandler = require('./middleware/errorHandler');
 const { rateLimiterMiddleware } = require('./middleware/rateLimiter');
 const logger = require('./utils/logger');
+const { connectDB } = require('./config/database');
 
 const app = express();
 
@@ -47,6 +48,31 @@ app.get('/health', (req, res) => {
     service: 'PYMES Chiquimula Backend',
     version: '1.0.0'
   });
+});
+
+// Database connection test endpoint
+app.get('/api/test-db', async (req, res) => {
+  try {
+    const pool = await connectDB();
+    const result = await pool.request().query('SELECT @@VERSION as version');
+    
+    res.status(200).json({
+      status: 'success',
+      message: 'Conexión exitosa a Azure SQL',
+      database: process.env.DB_DATABASE,
+      server: process.env.DB_SERVER,
+      sqlVersion: result.recordset[0].version,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Fallo la conexión a la base de datos',
+      error: error.message,
+      tip: error.message.includes('IP address') ? 'Tu IP no está autorizada en el Firewall de Azure.' : 'Verifica las credenciales en el archivo .env',
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // API routes

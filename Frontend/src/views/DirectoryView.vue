@@ -7,13 +7,27 @@ import BusinessCard from '../components/business/BusinessCard.vue'
 const route = useRoute()
 const router = useRouter()
 
+const isFilterOpen = ref(false)
 const searchKeyword = ref('')
 const selectedDept = ref('Todas')
 const selectedMuni = ref('Todas')
 const searchBarrio = ref('')
 const selectedCategory = ref('Todas')
 
-// BASE DE DATOS COMPLETA DE GUATEMALA
+// Detectar si es PC para mantener filtros abiertos
+const isDesktop = ref(window.innerWidth >= 1024)
+const updateView = () => {
+  isDesktop.value = window.innerWidth >= 1024
+  if (isDesktop.value) isFilterOpen.value = true
+}
+
+onMounted(() => {
+  window.addEventListener('resize', updateView)
+  updateView()
+  if (route.query.q) searchKeyword.value = route.query.q
+})
+
+// BASE DE DATOS COMPLETA
 const locationsData = {
   'Alta Verapaz': ['Chahal', 'Chisec', 'Cobán', 'Fray Bartolomé de las Casas', 'La Tinta', 'Lanquín', 'Panzós', 'Raxruhá', 'San Cristóbal Verapaz', 'San Juan Chamelco', 'San Pedro Carchá', 'Santa Cruz Verapaz', 'Santa María Cahabón', 'Senahú', 'Tamahú', 'Tactic', 'Tucurú'],
   'Baja Verapaz': ['Cubulco', 'Granados', 'Purulhá', 'Rabinal', 'Salamá', 'San Jerónimo', 'San Miguel Chicaj', 'Santa Cruz el Chol'],
@@ -44,24 +58,12 @@ watch(selectedDept, () => {
   searchBarrio.value = ''
 })
 
-watch(selectedMuni, () => {
-  searchBarrio.value = ''
-})
-
 const departments = ['Todas', ...Object.keys(locationsData)]
-
 const municipalities = computed(() => {
   if (selectedDept.value === 'Todas') return []
   return ['Todas', ...locationsData[selectedDept.value]]
 })
 
-onMounted(() => {
-  if (route.query.q) searchKeyword.value = route.query.q
-})
-
-const categories = ['Todas', 'Restaurantes', 'Salud', 'Servicios', 'Tecnología', 'Belleza', 'Comercio']
-
-// RESTAURANDO TODOS LOS LOCALES Y MÁS
 const allBusinesses = ref([
   { id: 1, name: 'Café El Despertar', category: 'Restaurantes', rating: 4.8, description: 'El mejor café artesanal.', dept: 'Sacatepéquez', muni: 'Antigua Guatemala', barrio: 'Barrio Santa Ana', image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80' },
   { id: 2, name: 'Clínica Dental Sonrisas', category: 'Salud', rating: 4.9, description: 'Atención dental profesional.', dept: 'Guatemala', muni: 'Guatemala', barrio: 'Zona 10', image: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=800&q=80' },
@@ -83,146 +85,97 @@ const normalize = (str) => {
 const filteredBusinesses = computed(() => {
   const keyword = normalize(searchKeyword.value)
   const barrioQuery = normalize(searchBarrio.value)
-  
   return allBusinesses.value.filter(b => {
     const matchDept = selectedDept.value === 'Todas' || b.dept === selectedDept.value
     const matchMuni = selectedMuni.value === 'Todas' || b.muni === selectedMuni.value
-    const bBarrio = normalize(b.barrio)
-    const matchBarrio = !barrioQuery || bBarrio.includes(barrioQuery)
+    const matchBarrio = !barrioQuery || normalize(b.barrio).includes(barrioQuery)
     const matchCategory = selectedCategory.value === 'Todas' || b.category === selectedCategory.value
-    
-    const name = normalize(b.name)
-    const category = normalize(b.category)
-    const description = normalize(b.description)
-    const matchKeyword = name.includes(keyword) || category.includes(keyword) || description.includes(keyword)
-
+    const matchKeyword = normalize(b.name).includes(keyword) || normalize(b.category).includes(keyword) || normalize(b.description).includes(keyword)
     return matchDept && matchMuni && matchBarrio && matchCategory && matchKeyword
   })
 })
 
-const triggerSearch = () => {
-  router.push({ query: { q: searchKeyword.value, dept: selectedDept.value, muni: selectedMuni.value } })
-}
+const categories = ['Todas', 'Restaurantes', 'Salud', 'Servicios', 'Tecnología', 'Belleza', 'Comercio']
+const toggleFilters = () => { if (!isDesktop.value) isFilterOpen.value = !isFilterOpen.value }
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50">
+  <div class="min-h-screen bg-white">
     <Navbar />
     
-    <div class="container mx-auto px-6 pt-32 pb-12">
-      <div class="flex flex-col lg:flex-row gap-8">
+    <div class="container mx-auto px-4 md:px-6 pt-32 pb-12">
+      <!-- Header with Toggle Button (Solo visible en celular) -->
+      <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+        <div>
+          <h1 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit">Nuestro <span class="text-fiery-red">Directorio</span></h1>
+          <p class="text-slate-500 font-medium mt-2">Explora los mejores negocios de toda Guatemala</p>
+        </div>
         
-        <aside class="w-full lg:w-1/4">
-          <div class="bg-white rounded-[2.5rem] shadow-xl shadow-fiery-navy/5 border border-slate-100 p-8 sticky top-28">
-            <h2 class="text-2xl font-black text-fiery-navy mb-8 font-outfit">Filtros</h2>
-            
-            <div class="space-y-6">
-              <div>
-                <label class="block text-xs font-black text-fiery-navy/40 uppercase tracking-widest mb-3 pl-1">Búsqueda rápida</label>
-                <div class="relative group">
-                  <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-fiery-red transition-colors">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                  </span>
-                  <input v-model="searchKeyword" @keyup.enter="triggerSearch" type="text" placeholder="Ej. Restaurante..." class="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-transparent focus:border-fiery-red/20 focus:bg-white focus:ring-4 focus:ring-fiery-red/5 outline-none transition-all font-bold text-fiery-navy">
-                </div>
-              </div>
+        <button 
+          v-if="!isDesktop"
+          @click="toggleFilters" 
+          :class="[
+            'flex lg:hidden items-center gap-3 px-8 py-4 rounded-2xl font-black transition-all shadow-xl active:scale-95',
+            isFilterOpen ? 'bg-fiery-navy text-white shadow-fiery-navy/20' : 'bg-fiery-red text-white shadow-fiery-red/20'
+          ]"
+        >
+          {{ isFilterOpen ? 'Cerrar Buscador' : 'Busca negocios' }}
+        </button>
+      </div>
 
-              <div class="space-y-5 pt-4 border-t border-slate-100">
-                <div>
-                  <label class="block text-xs font-black text-fiery-navy/40 uppercase tracking-widest mb-2 pl-1">Departamento</label>
-                  <div class="relative">
-                    <select v-model="selectedDept" class="w-full pl-4 pr-10 py-4 rounded-2xl bg-slate-50 border border-transparent focus:border-fiery-red/20 focus:bg-white focus:ring-4 focus:ring-fiery-red/5 outline-none transition-all font-bold text-fiery-navy appearance-none cursor-pointer">
-                      <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
-                    </select>
-                    <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                    </span>
-                  </div>
-                </div>
-
-                <transition name="fade">
-                  <div v-if="selectedDept !== 'Todas'">
-                    <label class="block text-xs font-black text-fiery-navy/40 uppercase tracking-widest mb-2 pl-1">Municipio</label>
-                    <div class="relative">
-                      <select v-model="selectedMuni" class="w-full pl-4 pr-10 py-4 rounded-2xl bg-slate-50 border border-transparent focus:border-fiery-red/20 focus:bg-white focus:ring-4 focus:ring-fiery-red/5 outline-none transition-all font-bold text-fiery-navy appearance-none cursor-pointer">
-                        <option v-for="muni in municipalities" :key="muni" :value="muni">{{ muni }}</option>
-                      </select>
-                      <span class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-                      </span>
-                    </div>
-                  </div>
-                </transition>
-
-                <transition name="fade">
-                  <div v-if="selectedMuni !== 'Todas'">
-                    <label class="block text-xs font-black text-fiery-navy/40 uppercase tracking-widest mb-2 pl-1">Aldea / Barrio</label>
-                    <div class="relative group">
-                      <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-fiery-red transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                      </span>
-                      <input v-model="searchBarrio" type="text" placeholder="¿En qué zona?" class="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border border-transparent focus:border-fiery-red/20 focus:bg-white focus:ring-4 focus:ring-fiery-red/5 outline-none transition-all font-bold text-fiery-navy">
-                    </div>
-                  </div>
-                </transition>
-              </div>
-
-              <div class="pt-4 border-t border-slate-100">
-                <label class="block text-xs font-black text-fiery-navy/40 uppercase tracking-widest mb-4 pl-1">Categorías</label>
-                <div class="space-y-2">
-                  <label v-for="cat in categories" :key="cat" class="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-fiery-red/5 transition-colors">
-                    <div class="relative flex items-center justify-center w-6 h-6 rounded-lg border-2 transition-all" :class="selectedCategory === cat ? 'border-fiery-red bg-fiery-red shadow-lg shadow-fiery-red/20' : 'border-slate-200 group-hover:border-fiery-red/50'">
-                      <svg v-if="selectedCategory === cat" class="w-4 h-4 text-white absolute" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                      <input type="radio" :value="cat" v-model="selectedCategory" class="opacity-0 absolute w-full h-full cursor-pointer" />
-                    </div>
-                    <span class="text-slate-600 font-bold transition-colors text-sm" :class="selectedCategory === cat ? 'text-fiery-navy' : 'group-hover:text-fiery-red'">{{ cat }}</span>
-                  </label>
-                </div>
-              </div>
+      <div class="flex flex-col lg:flex-row gap-8">
+        <!-- Sidebar Filters: Always visible on PC, Toggleable on Mobile -->
+        <transition :name="isDesktop ? '' : 'slide-fade'">
+          <aside v-if="isFilterOpen || isDesktop" class="w-full lg:w-[320px] shrink-0">
+            <div class="bg-slate-50 rounded-[2.5rem] border border-slate-100 p-8 lg:sticky lg:top-28">
+              <h2 class="text-xl font-black text-fiery-navy mb-6 uppercase tracking-widest text-sm">Filtros</h2>
               
-              <button @click="triggerSearch" class="w-full bg-fiery-navy hover:bg-fiery-red text-white font-black py-5 rounded-2xl transition-all shadow-xl shadow-fiery-navy/10 mt-6 uppercase tracking-[0.2em] text-xs">
-                Ver resultados
-              </button>
-            </div>
-          </div>
-        </aside>
+              <div class="space-y-6">
+                <div>
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">¿Qué buscas?</label>
+                  <input v-model="searchKeyword" type="text" placeholder="Nombre..." class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none transition-all font-bold text-fiery-navy shadow-sm">
+                </div>
 
-        <main class="w-full lg:w-3/4">
+                <div class="space-y-4 pt-4 border-t border-slate-200">
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ubicación</label>
+                  <select v-model="selectedDept" class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy appearance-none cursor-pointer shadow-sm">
+                    <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
+                  </select>
+                  <select v-if="selectedDept !== 'Todas'" v-model="selectedMuni" class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy appearance-none cursor-pointer shadow-sm">
+                    <option v-for="muni in municipalities" :key="muni" :value="muni">{{ muni }}</option>
+                  </select>
+                  <input v-if="selectedMuni !== 'Todas'" v-model="searchBarrio" type="text" placeholder="Zona o Barrio..." class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy shadow-sm">
+                </div>
+
+                <div class="pt-4 border-t border-slate-200">
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Categorías</label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button v-for="cat in categories" :key="cat" @click="selectedCategory = cat" :class="[selectedCategory === cat ? 'bg-fiery-red text-white' : 'bg-white text-slate-500 hover:border-fiery-red/30', 'px-2 py-2 rounded-xl text-[10px] font-black uppercase transition-all border border-slate-100']">{{ cat }}</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </transition>
+
+        <!-- Results Grid -->
+        <main class="flex-1">
           <div v-if="filteredBusinesses.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             <BusinessCard v-for="business in filteredBusinesses" :key="business.id" :business="business" />
           </div>
-          
-          <div v-else class="bg-white rounded-[3rem] p-16 text-center border border-slate-100 shadow-xl shadow-fiery-navy/5">
-            <div class="w-24 h-24 bg-fiery-cream rounded-full flex items-center justify-center mx-auto mb-6 text-fiery-red">
-              <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
-            <h3 class="text-3xl font-black text-fiery-navy mb-4 font-outfit">Sin coincidencias</h3>
-            <p class="text-slate-500 text-lg mb-8 max-w-md mx-auto">No hay negocios que coincidan con estos filtros específicos.</p>
-            <button @click="() => { searchKeyword = ''; selectedDept = 'Todas'; triggerSearch(); }" class="bg-fiery-red text-white font-black px-8 py-4 rounded-2xl hover:bg-fiery-darkred transition-all shadow-lg shadow-fiery-red/20">
-              Reiniciar filtros
-            </button>
+          <div v-else class="bg-white rounded-[3rem] p-16 text-center border border-slate-100">
+            <h3 class="text-3xl font-black text-fiery-navy mb-4 font-outfit uppercase">Sin resultados</h3>
+            <button @click="() => { searchKeyword = ''; selectedDept = 'Todas'; }" class="bg-fiery-red text-white font-black px-8 py-4 rounded-2xl">Reiniciar filtros</button>
           </div>
         </main>
-
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.font-outfit {
-  font-family: 'Outfit', sans-serif;
-}
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-select {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-}
+.font-outfit { font-family: 'Outfit', sans-serif; }
+.slide-fade-enter-active, .slide-fade-leave-active { transition: all 0.4s ease; }
+.slide-fade-enter-from, .slide-fade-leave-to { transform: translateX(-20px); opacity: 0; }
+select { appearance: none; }
 </style>
