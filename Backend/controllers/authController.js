@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
+const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const logger = require('../utils/logger');
 
 const generateToken = (userId) => {
@@ -169,6 +171,67 @@ const login = async (req, res) => {
   }
 };
 
+const googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ error: 'idToken is required' });
+    }
+
+    // Verify Google Token
+    const ticket = await client.verifyIdToken({
+      idToken: idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { email, given_name, family_name, picture } = payload;
+
+    // Check if user exists
+    let user = await User.findByEmail(email);
+
+    if (!user) {
+      // Create user if they don't exist
+      const userData = {
+        nombre: given_name || 'Usuario',
+        apellido: family_name || 'Google',
+        correo: email,
+        password_hash: 'GOOGLE_AUTH_ACCOUNT', // Placeholder since it's Google Auth
+        id_rol: 2, // Default role
+        activo: 1
+      };
+      
+      const newUserResult = await User.create(userData);
+      user = await User.findById(newUserResult.id_usuario);
+      logger.info(`New user created via Google: ${email}`);
+    } else if (!user.activo) {
+      return res.status(401).json({ error: 'Login failed', message: 'Account is deactivated' });
+    }
+
+    // Generate our app's JWT
+    const token = generateToken(user.id_usuario);
+    delete user.password_hash;
+
+    logger.info(`User logged in via Google: ${email}`, { ip: req.ip });
+
+    res.json({
+      success: true,
+      message: 'Google login successful',
+      data: {
+        user,
+        token
+      }
+    });
+  } catch (error) {
+    logger.error('Google login error:', error);
+    res.status(500).json({
+      error: 'Google login failed',
+      message: 'Internal server error during Google authentication'
+    });
+  }
+};
+
 const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id_usuario);
@@ -276,6 +339,7 @@ const changePassword = async (req, res) => {
 module.exports = {
   register,
   login,
+  googleLogin,
   getProfile,
   updateProfile,
   changePassword,

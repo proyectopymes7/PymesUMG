@@ -5,6 +5,7 @@ const { authRateLimiterMiddleware } = require('../middleware/rateLimiter');
 const {
   register,
   login,
+  googleLogin,
   getProfile,
   updateProfile,
   changePassword,
@@ -20,6 +21,7 @@ router.use(authRateLimiterMiddleware);
 // Public routes
 router.post('/register', validateRegister, register);
 router.post('/login', validateLogin, login);
+router.post('/google', googleLogin);
 
 // Protected routes
 router.get('/profile', auth, getProfile);

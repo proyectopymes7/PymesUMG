@@ -13,11 +13,51 @@ const currentCarouselIndex = ref(0)
 
 // Featured data
 const featuredBusinesses = ref([
-  { id: 1, name: 'TechSolutions Guatemala', category: 'Tecnología', rating: 4.8, description: 'Soporte técnico y desarrollo de software especializado.', location: 'Zona 10, Ciudad de Guatemala', image: 'https://images.unsplash.com/photo-1573164713988-8665fc963095?q=80&w=800&auto=format&fit=crop' },
-  { id: 2, name: 'Café de Antigua', category: 'Restaurante', rating: 4.9, description: 'El mejor café artesanal tostado en leña.', location: 'Antigua Guatemala', image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=800&auto=format&fit=crop' },
-  { id: 3, name: 'Muebles Artesanales', category: 'Hogar', rating: 4.6, description: 'Muebles de cedro tallados por maestros artesanos.', location: 'Quetzaltenango', image: 'https://images.unsplash.com/photo-1524758631624-e2822e304c36?q=80&w=800&auto=format&fit=crop' },
-  { id: 7, name: 'AutoServicios Rápidos', category: 'Automotriz', rating: 4.7, description: 'Mantenimiento preventivo y mecánica general.', location: 'Zona 5, Ciudad de Guatemala', image: 'https://images.unsplash.com/photo-1605810230434-7631ac76ec81?q=80&w=800&auto=format&fit=crop' },
-  { id: 8, name: 'Panadería La Casera', category: 'Alimentación', rating: 4.9, description: 'Pan caliente cada hora y repostería tradicional.', location: 'Mixco', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=800&auto=format&fit=crop' }
+  { 
+    id: 1, 
+    name: 'Café de la Montaña', 
+    category: 'Cafetería', 
+    rating: 4.8, 
+    description: 'El mejor café de altura cultivado artesanalmente en las faldas del volcán de Ipala. Sabor único y aroma intenso.', 
+    location: 'Chiquimula', 
+    image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?q=80&w=1000&auto=format&fit=crop' 
+  },
+  { 
+    id: 2, 
+    name: 'Carpintería El Roble', 
+    category: 'Carpintería', 
+    rating: 4.9, 
+    description: 'Muebles de madera sólida con acabados de lujo. Transformamos tus ideas en piezas eternas para tu hogar.', 
+    location: 'Esquipulas', 
+    image: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?q=80&w=1000&auto=format&fit=crop' 
+  },
+  { 
+    id: 3, 
+    name: 'Panadería La Bendición', 
+    category: 'Alimentación', 
+    rating: 4.7, 
+    description: 'Pan recién horneado todas las mañanas. Tradición y sabor en cada mordida, desde panes dulces hasta integrales.', 
+    location: 'Zacapa', 
+    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=1000&auto=format&fit=crop' 
+  },
+  { 
+    id: 4, 
+    name: 'Taller Mecánico Central', 
+    category: 'Automotriz', 
+    rating: 4.6, 
+    description: 'Especialistas en mecánica general y enderezado y pintura. Confianza y rapidez para tu vehículo.', 
+    location: 'Chiquimula', 
+    image: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?q=80&w=1000&auto=format&fit=crop' 
+  },
+  { 
+    id: 5, 
+    name: 'Vivero Los Girasoles', 
+    category: 'Jardinería', 
+    rating: 5.0, 
+    description: 'Variedad de plantas ornamentales, frutales y herramientas de jardinería. Dale vida a tu jardín.', 
+    location: 'Ipala', 
+    image: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?q=80&w=1000&auto=format&fit=crop' 
+  }
 ])
 
 // Carousel Logic
