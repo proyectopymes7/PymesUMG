@@ -43,7 +43,7 @@ const getEmprendimientos = async (req, res) => {
   try {
     const filters = {
       id_categoria: req.query.id_categoria,
-      estado: req.query.estado || 'activo',
+      estado: req.query.estado || 'APROBADO',
       destacado: req.query.destacado === 'true' ? 1 : req.query.destacado === 'false' ? 0 : undefined,
       limit: parseInt(req.query.limit) || 50,
       offset: parseInt(req.query.offset) || 0
@@ -222,7 +222,7 @@ const searchEmprendimientos = async (req, res) => {
 
     const filters = {
       id_categoria,
-      estado: 'activo',
+      estado: 'APROBADO',
       limit: parseInt(limit),
       offset: parseInt(offset)
     };
@@ -327,8 +327,8 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['activo', 'inactivo', 'pendiente'])
-      .withMessage('Estado must be activo, inactivo, or pendiente')
+      .isIn(['APROBADO', 'BORRADOR', 'PENDIENTE', 'RECHAZADO'])
+      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO')
   ],
   validateUpdateEmprendimiento: [
     body('nombre')

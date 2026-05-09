@@ -3,16 +3,16 @@ const { executeQuery, sql } = require('../config/database');
 class Categoria {
   static async create(categoriaData) {
     const query = `
-      INSERT INTO CATEGORIAS (id_categoria_padre, nombre, descripcion, activo)
+      INSERT INTO Categorias (id_categoria_padre, nombre, descripcion, activo)
       VALUES (@id_categoria_padre, @nombre, @descripcion, @activo);
       SELECT SCOPE_IDENTITY() as id_categoria;
     `;
     
     const params = [
-      { value: categoriaData.id_categoria_padre || null, type: sql.Int },
-      { value: categoriaData.nombre, type: sql.VarChar },
-      { value: categoriaData.descripcion, type: sql.VarChar },
-      { value: categoriaData.activo !== undefined ? categoriaData.activo : 1, type: sql.Bit }
+      { name: 'id_categoria_padre', value: categoriaData.id_categoria_padre || null, type: sql.Int },
+      { name: 'nombre', value: categoriaData.nombre, type: sql.VarChar },
+      { name: 'descripcion', value: categoriaData.descripcion, type: sql.VarChar },
+      { name: 'activo', value: categoriaData.activo !== undefined ? categoriaData.activo : 1, type: sql.Bit }
     ];
 
     try {
@@ -27,12 +27,12 @@ class Categoria {
     const query = `
       SELECT c.*, 
              cp.nombre as nombre_padre
-      FROM CATEGORIAS c
-      LEFT JOIN CATEGORIAS cp ON c.id_categoria_padre = cp.id_categoria
+      FROM Categorias c
+      LEFT JOIN Categorias cp ON c.id_categoria_padre = cp.id_categoria
       WHERE c.id_categoria = @id_categoria;
     `;
     
-    const params = [{ value: id, type: sql.Int }];
+    const params = [{ name: 'id_categoria', value: id, type: sql.Int }];
     
     try {
       const result = await executeQuery(query, params);
@@ -44,8 +44,8 @@ class Categoria {
 
   static async findAll(activeOnly = false) {
     const query = activeOnly 
-      ? 'SELECT * FROM CATEGORIAS WHERE activo = 1 ORDER BY nombre'
-      : 'SELECT * FROM CATEGORIAS ORDER BY nombre';
+      ? 'SELECT * FROM Categorias WHERE activo = 1 ORDER BY nombre'
+      : 'SELECT * FROM Categorias ORDER BY nombre';
     
     try {
       return await executeQuery(query);
@@ -65,7 +65,7 @@ class Categoria {
           activo,
           0 as level,
           CAST(id_categoria AS VARCHAR(100)) as path
-        FROM CATEGORIAS
+        FROM Categorias
         WHERE id_categoria_padre IS NULL
         
         UNION ALL
@@ -78,14 +78,14 @@ class Categoria {
           c.activo,
           ct.level + 1,
           CAST(ct.path + '/' + CAST(c.id_categoria AS VARCHAR(10)) AS VARCHAR(100))
-        FROM CATEGORIAS c
+        FROM Categorias c
         INNER JOIN CategoryTree ct ON c.id_categoria_padre = ct.id_categoria
       )
       SELECT 
         ct.*,
         cp.nombre as nombre_padre
       FROM CategoryTree ct
-      LEFT JOIN CATEGORIAS cp ON ct.id_categoria_padre = cp.id_categoria
+      LEFT JOIN Categorias cp ON ct.id_categoria_padre = cp.id_categoria
       ORDER BY ct.path;
     `;
     
@@ -98,12 +98,12 @@ class Categoria {
 
   static async findSubcategories(parentId) {
     const query = `
-      SELECT * FROM CATEGORIAS 
+      SELECT * FROM Categorias 
       WHERE id_categoria_padre = @id_categoria_padre 
       ORDER BY nombre;
     `;
     
-    const params = [{ value: parentId, type: sql.Int }];
+    const params = [{ name: 'id_categoria_padre', value: parentId, type: sql.Int }];
     
     try {
       return await executeQuery(query, params);
@@ -114,12 +114,12 @@ class Categoria {
 
   static async update(id, categoriaData) {
     const setClause = [];
-    const params = [{ value: id, type: sql.Int }];
+    const params = [{ name: 'id_categoria', value: id, type: sql.Int }];
 
     Object.keys(categoriaData).forEach((key, index) => {
       if (categoriaData[key] !== undefined) {
         setClause.push(`${key} = @param${index}`);
-        params.push({ value: categoriaData[key], type: key === 'activo' ? sql.Bit : sql.NVarChar });
+        params.push({ name: `param${index}`, value: categoriaData[key], type: key === 'activo' ? sql.Bit : sql.NVarChar });
       }
     });
 
@@ -128,7 +128,7 @@ class Categoria {
     }
 
     const query = `
-      UPDATE CATEGORIAS 
+      UPDATE Categorias 
       SET ${setClause.join(', ')}
       WHERE id_categoria = @id_categoria;
     `;
@@ -141,34 +141,8 @@ class Categoria {
     }
   }
 
-  // Soft delete will be implemented later
-  // static async delete(id) {
-  //   // Check if category has children
-  //   const checkChildrenQuery = 'SELECT COUNT(*) as count FROM CATEGORIAS WHERE id_categoria_padre = @id_categoria';
-  //   const checkChildrenParams = [{ value: id, type: sql.Int }];
-  //   
-  //   try {
-  //     const childrenResult = await executeQuery(checkChildrenQuery, checkChildrenParams);
-  //     if (childrenResult[0].count > 0) {
-  //       throw new Error('Cannot delete category: it has subcategories');
-  //     }
-  //
-  //     // Check if category is being used by emprendimientos
-  //     const checkEmprendimientosQuery = 'SELECT COUNT(*) as count FROM EMPRENDIMIENTOS WHERE id_categoria = @id_categoria';
-  //     const emprendimientosResult = await executeQuery(checkEmprendimientosQuery, checkChildrenParams);
-  //     if (emprendimientosResult[0].count > 0) {
-  //       throw new Error('Cannot delete category: it is being used by emprendimientos');
-  //     }
-  //
-  //     const deleteQuery = 'DELETE FROM CATEGORIAS WHERE id_categoria = @id_categoria';
-  //     await executeQuery(deleteQuery, [{ value: id, type: sql.Int }]);
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
   static async count() {
-    const query = 'SELECT COUNT(*) as total FROM CATEGORIAS';
+    const query = 'SELECT COUNT(*) as total FROM Categorias';
     
     try {
       const result = await executeQuery(query);
