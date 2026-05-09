@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
+import { getAllBusinesses, getCategories } from '../data/mockData'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,18 +65,7 @@ const municipalities = computed(() => {
   return ['Todas', ...locationsData[selectedDept.value]]
 })
 
-const allBusinesses = ref([
-  { id: 1, name: 'Café El Despertar', category: 'Restaurantes', rating: 4.8, description: 'El mejor café artesanal cultivado en Chiquimula.', dept: 'Chiquimula', muni: 'Chiquimula', barrio: 'Barrio El Molino', image: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80' },
-  { id: 2, name: 'Clínica Dental Sonrisas', category: 'Salud', rating: 4.9, description: 'Atención dental profesional y amable.', dept: 'Zacapa', muni: 'Zacapa', barrio: 'Barrio Nuevo', image: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=800&q=80' },
-  { id: 3, name: 'Ferretería El Tornillo', category: 'Comercio', rating: 4.5, description: 'Todo para la construcción y el hogar.', dept: 'Chiquimula', muni: 'Esquipulas', barrio: 'Centro', image: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?auto=format&fit=crop&w=800&q=80' },
-  { id: 4, name: 'Taller Mecánico Central', category: 'Servicios', rating: 4.7, description: 'Reparación de motores y pintura automotriz.', dept: 'Chiquimula', muni: 'Chiquimula', barrio: 'Zona 1', image: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&q=80' },
-  { id: 5, name: 'Panadería La Bendición', category: 'Restaurantes', rating: 4.6, description: 'Pan dulce y francés calientito todo el día.', dept: 'Jalapa', muni: 'Jalapa', barrio: 'Barrio La Democracia', image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=800&q=80' },
-  { id: 6, name: 'Salón de Belleza Glamour', category: 'Belleza', rating: 4.3, description: 'Cortes, tintes y tratamientos de spa.', dept: 'Chiquimula', muni: 'Ipala', barrio: 'Centro', image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80' },
-  { id: 7, name: 'Librería El Saber', category: 'Comercio', rating: 4.2, description: 'Útiles escolares y oficina.', dept: 'Zacapa', muni: 'Gualán', barrio: 'Barrio San Miguel', image: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=800&q=80' },
-  { id: 8, name: 'Restaurante Sabor Chapín', category: 'Restaurantes', rating: 4.8, description: 'Pepián, jocón y más platillos tradicionales.', dept: 'Chiquimula', muni: 'Quezaltepeque', barrio: 'Zona 2', image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80' },
-  { id: 9, name: 'Electrónica El Rayo', category: 'Tecnología', rating: 4.9, description: 'Reparación de celulares y laptops.', dept: 'Jalapa', muni: 'Monjas', barrio: 'Centro', image: 'https://images.unsplash.com/photo-1597872200969-2b65d56bd16b?auto=format&fit=crop&w=800&q=80' },
-  { id: 10, name: 'Vivero Los Girasoles', category: 'Servicios', rating: 5.0, description: 'Venta de plantas y flores de temporada.', dept: 'Chiquimula', muni: 'San Jacinto', barrio: 'Entrada Principal', image: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&w=800&q=80' }
-])
+const allBusinesses = ref(getAllBusinesses())
 
 const normalize = (str) => {
   if (!str) return ''
@@ -95,7 +85,7 @@ const filteredBusinesses = computed(() => {
   })
 })
 
-const categories = ['Todas', 'Restaurantes', 'Salud', 'Servicios', 'Tecnología', 'Belleza', 'Comercio']
+const categories = getCategories()
 const toggleFilters = () => { if (!isDesktop.value) isFilterOpen.value = !isFilterOpen.value }
 </script>
 
