@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
 import heroBgImage from '../assets/images/hero_bg.png'
+import { getFeaturedBusinesses } from '../data/mockData'
 
 const router = useRouter()
 const searchCategory = ref('Ubicación')
@@ -11,54 +12,11 @@ const searchKeyword = ref('')
 const searchLocation = ref('')
 const currentCarouselIndex = ref(0)
 
-// Featured data
-const featuredBusinesses = ref([
-  { 
-    id: 1, 
-    name: 'Café de la Montaña', 
-    category: 'Cafetería', 
-    rating: 4.8, 
-    description: 'El mejor café de altura cultivado artesanalmente en las faldas del volcán de Ipala. Sabor único y aroma intenso.', 
-    location: 'Chiquimula', 
-    image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?q=80&w=1000&auto=format&fit=crop' 
-  },
-  { 
-    id: 2, 
-    name: 'Carpintería El Roble', 
-    category: 'Carpintería', 
-    rating: 4.9, 
-    description: 'Muebles de madera sólida con acabados de lujo. Transformamos tus ideas en piezas eternas para tu hogar.', 
-    location: 'Esquipulas', 
-    image: 'https://images.unsplash.com/photo-1533090161767-e6ffed986c88?q=80&w=1000&auto=format&fit=crop' 
-  },
-  { 
-    id: 3, 
-    name: 'Panadería La Bendición', 
-    category: 'Alimentación', 
-    rating: 4.7, 
-    description: 'Pan recién horneado todas las mañanas. Tradición y sabor en cada mordida, desde panes dulces hasta integrales.', 
-    location: 'Zacapa', 
-    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=1000&auto=format&fit=crop' 
-  },
-  { 
-    id: 4, 
-    name: 'Taller Mecánico Central', 
-    category: 'Automotriz', 
-    rating: 4.6, 
-    description: 'Especialistas en mecánica general y enderezado y pintura. Confianza y rapidez para tu vehículo.', 
-    location: 'Chiquimula', 
-    image: 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?q=80&w=1000&auto=format&fit=crop' 
-  },
-  { 
-    id: 5, 
-    name: 'Vivero Los Girasoles', 
-    category: 'Jardinería', 
-    rating: 5.0, 
-    description: 'Variedad de plantas ornamentales, frutales y herramientas de jardinería. Dale vida a tu jardín.', 
-    location: 'Ipala', 
-    image: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?q=80&w=1000&auto=format&fit=crop' 
-  }
-])
+// Featured data — sorted by reviewCount from centralized mock
+const featuredBusinesses = ref(getFeaturedBusinesses(5).map(b => ({
+  id: b.id, name: b.name, category: b.category, rating: b.rating,
+  description: b.description, location: b.location, image: b.image
+})))
 
 // Carousel Logic
 const nextCard = () => { currentCarouselIndex.value = (currentCarouselIndex.value + 1) % featuredBusinesses.value.length }

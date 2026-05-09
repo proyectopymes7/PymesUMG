@@ -2,47 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
+import { getBusinessById } from '../data/mockData'
 
 const route = useRoute()
 const router = useRouter()
 const business = ref(null)
-
-const fetchBusinessDetails = (id) => {
-  return {
-    id: id,
-    name: 'Café El Despertar',
-    logo: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=400&auto=format&fit=crop',
-    category: 'Restaurantes',
-    rating: 4.8,
-    reviewCount: 124,
-    description: 'El mejor café artesanal y repostería local para empezar tu día con energía. Nuestro grano es seleccionado cuidadosamente de las fincas más prestigiosas del país para garantizar una experiencia sensorial única en cada taza.',
-    location: 'Zona 1, Ciudad de Guatemala',
-    hours: [
-      { day: 'Lunes - Viernes', time: '7:00 AM - 8:00 PM' },
-      { day: 'Sábado', time: '8:00 AM - 6:00 PM' },
-      { day: 'Domingo', time: '9:00 AM - 4:00 PM' }
-    ],
-    socials: {
-      whatsapp: 'https://wa.me/50212345678',
-      instagram: 'https://instagram.com',
-      facebook: 'https://facebook.com',
-      website: 'https://google.com'
-    },
-    products: [
-      { id: 1, name: 'Cappuccino Artesanal', price: 'Q 25.00', image: 'https://images.unsplash.com/photo-1572442388796-11668a67e53d?q=80&w=400&auto=format&fit=crop' },
-      { id: 2, name: 'Pastel de Chocolate', price: 'Q 35.00', image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?q=80&w=400&auto=format&fit=crop' },
-      { id: 3, name: 'Desayuno Típico', price: 'Q 45.00', image: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?q=80&w=400&auto=format&fit=crop' }
-    ],
-    services: [
-      { name: 'WiFi Gratuito', price: 'Gratis' },
-      { name: 'Reserva de Mesas', price: 'Gratis' }
-    ],
-    reviews: [
-      { id: 1, user: 'Ana García', rating: 5, comment: '¡Increíble lugar! El café es delicioso y el ambiente es perfecto.', date: 'Hace 2 días' },
-      { id: 2, user: 'Carlos Ruiz', rating: 4, comment: 'Muy buena atención, aunque el pastel de chocolate estaba un poco seco.', date: 'Hace 1 semana' }
-    ]
-  }
-}
 
 const mapUrl = computed(() => {
   if (!business.value) return ''
@@ -51,7 +15,7 @@ const mapUrl = computed(() => {
 })
 
 onMounted(() => {
-  business.value = fetchBusinessDetails(route.params.id)
+  business.value = getBusinessById(route.params.id)
 })
 
 const goBack = () => {
