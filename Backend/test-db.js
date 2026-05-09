@@ -11,11 +11,11 @@ async function testConnection() {
     try {
         const pool = await connectDB();
         console.log('✅ Conexión exitosa!');
-        
+
         // Intentar una consulta simple
         const result = await pool.request().query('SELECT @@VERSION as version');
         console.log('Versión de SQL Server:', result.recordset[0].version);
-        
+
         await pool.close();
         process.exit(0);
     } catch (err) {
@@ -27,5 +27,9 @@ async function testConnection() {
         process.exit(1);
     }
 }
+console.log(process.env.DB_SERVER);
+console.log(process.env.DB_DATABASE);
+console.log(process.env.DB_USER);
+console.log(process.env.DB_PASSWORD);
 
 testConnection();

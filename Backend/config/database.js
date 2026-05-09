@@ -44,13 +44,19 @@ const executeQuery = async (query, params = []) => {
     
     // Add parameters if provided
     params.forEach((param, index) => {
-      request.input(`param${index}`, param.value, param.type);
+      // Use param.name if provided, otherwise use paramIndex convention
+      const paramName = param.name || `param${index}`;
+      request.input(paramName, param.type, param.value);
     });
 
     const result = await request.query(query);
     return result.recordset;
   } catch (error) {
-    logger.error('Query execution failed:', error);
+    logger.error('Query execution failed:', {
+      query,
+      params: params.map(p => ({ name: p.name, type: p.type?.name, value: p.value })),
+      error: error.message
+    });
     throw error;
   }
 };

@@ -3,18 +3,18 @@ const { executeQuery, sql } = require('../config/database');
 class User {
   static async create(userData) {
     const query = `
-      INSERT INTO USUARIOS (id_rol, nombre, apellido, correo, password_hash, activo, fecha_registro)
+      INSERT INTO Usuarios (id_rol, nombre, apellido, correo, password_hash, activo, fecha_registro)
       VALUES (@id_rol, @nombre, @apellido, @correo, @password_hash, @activo, GETDATE());
       SELECT SCOPE_IDENTITY() as id_usuario;
     `;
     
     const params = [
-      { value: userData.id_rol, type: sql.Int },
-      { value: userData.nombre, type: sql.NVarChar },
-      { value: userData.apellido, type: sql.NVarChar },
-      { value: userData.correo, type: sql.VarChar },
-      { value: userData.password_hash, type: sql.VarChar },
-      { value: userData.activo || 1, type: sql.Bit }
+      { name: 'id_rol', value: userData.id_rol, type: sql.Int },
+      { name: 'nombre', value: userData.nombre, type: sql.NVarChar },
+      { name: 'apellido', value: userData.apellido, type: sql.NVarChar },
+      { name: 'correo', value: userData.correo, type: sql.VarChar },
+      { name: 'password_hash', value: userData.password_hash, type: sql.VarChar },
+      { name: 'activo', value: userData.activo || 1, type: sql.Bit }
     ];
 
     try {
@@ -28,12 +28,12 @@ class User {
   static async findById(id) {
     const query = `
       SELECT u.*, r.nombre as rol_nombre, r.descripcion as rol_descripcion
-      FROM USUARIOS u
-      LEFT JOIN ROLES r ON u.id_rol = r.id_rol
+      FROM Usuarios u
+      LEFT JOIN Roles r ON u.id_rol = r.id_rol
       WHERE u.id_usuario = @id_usuario;
     `;
     
-    const params = [{ value: id, type: sql.Int }];
+    const params = [{ name: 'id_usuario', value: id, type: sql.Int }];
     
     try {
       const result = await executeQuery(query, params);
@@ -46,12 +46,12 @@ class User {
   static async findByEmail(email) {
     const query = `
       SELECT u.*, r.nombre as rol_nombre, r.descripcion as rol_descripcion
-      FROM USUARIOS u
-      LEFT JOIN ROLES r ON u.id_rol = r.id_rol
+      FROM Usuarios u
+      LEFT JOIN Roles r ON u.id_rol = r.id_rol
       WHERE u.correo = @correo;
     `;
     
-    const params = [{ value: email, type: sql.VarChar }];
+    const params = [{ name: 'correo', value: email, type: sql.VarChar }];
     
     try {
       const result = await executeQuery(query, params);
@@ -66,15 +66,15 @@ class User {
       SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.activo, 
              u.fecha_registro, u.intentos_fallidos, u.bloqueado_hasta,
              r.nombre as rol_nombre
-      FROM USUARIOS u
-      LEFT JOIN ROLES r ON u.id_rol = r.id_rol
+      FROM Usuarios u
+      LEFT JOIN Roles r ON u.id_rol = r.id_rol
       ORDER BY u.fecha_registro DESC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
     `;
     
     const params = [
-      { value: offset, type: sql.Int },
-      { value: limit, type: sql.Int }
+      { name: 'offset', value: offset, type: sql.Int },
+      { name: 'limit', value: limit, type: sql.Int }
     ];
     
     try {
@@ -86,12 +86,12 @@ class User {
 
   static async update(id, userData) {
     const setClause = [];
-    const params = [{ value: id, type: sql.Int }];
+    const params = [{ name: 'id_usuario', value: id, type: sql.Int }];
 
     Object.keys(userData).forEach((key, index) => {
       if (userData[key] !== undefined) {
         setClause.push(`${key} = @param${index}`);
-        params.push({ value: userData[key], type: sql.NVarChar });
+        params.push({ name: `param${index}`, value: userData[key], type: sql.NVarChar });
       }
     });
 
@@ -100,7 +100,7 @@ class User {
     }
 
     const query = `
-      UPDATE USUARIOS 
+      UPDATE Usuarios 
       SET ${setClause.join(', ')}
       WHERE id_usuario = @id_usuario;
     `;
@@ -115,14 +115,14 @@ class User {
 
   static async updateFailedAttempts(id, attempts) {
     const query = `
-      UPDATE USUARIOS 
+      UPDATE Usuarios 
       SET intentos_fallidos = @intentos_fallidos
       WHERE id_usuario = @id_usuario;
     `;
     
     const params = [
-      { value: attempts, type: sql.Int },
-      { value: id, type: sql.Int }
+      { name: 'intentos_fallidos', value: attempts, type: sql.Int },
+      { name: 'id_usuario', value: id, type: sql.Int }
     ];
     
     try {
@@ -134,14 +134,14 @@ class User {
 
   static async blockUser(id, blockUntil) {
     const query = `
-      UPDATE USUARIOS 
+      UPDATE Usuarios 
       SET bloqueado_hasta = @bloqueado_hasta, intentos_fallidos = 0
       WHERE id_usuario = @id_usuario;
     `;
     
     const params = [
-      { value: blockUntil, type: sql.DateTime2 },
-      { value: id, type: sql.Int }
+      { name: 'bloqueado_hasta', value: blockUntil, type: sql.DateTime2 },
+      { name: 'id_usuario', value: id, type: sql.Int }
     ];
     
     try {
@@ -151,20 +151,8 @@ class User {
     }
   }
 
-  // Soft delete will be implemented later
-  // static async delete(id) {
-  //   const query = 'DELETE FROM USUARIOS WHERE id_usuario = @id_usuario';
-  //   const params = [{ value: id, type: sql.Int }];
-  //   
-  //   try {
-  //     await executeQuery(query, params);
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
   static async count() {
-    const query = 'SELECT COUNT(*) as total FROM USUARIOS';
+    const query = 'SELECT COUNT(*) as total FROM Usuarios';
     
     try {
       const result = await executeQuery(query);
