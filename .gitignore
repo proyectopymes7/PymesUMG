@@ -107,5 +107,4 @@ coverage/
 *.db
 
 # Build artifacts
-build/
-dist/
+
