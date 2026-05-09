@@ -2,7 +2,6 @@ require('dotenv').config();
 const { connectDB, sql } = require('./config/database');
 
 async function testConnection() {
-    console.log('--- Probando conexión a Azure SQL ---');
     console.log('Servidor:', process.env.DB_SERVER);
     console.log('Base de Datos:', process.env.DB_DATABASE);
     console.log('Usuario:', process.env.DB_USER);
@@ -19,7 +18,7 @@ async function testConnection() {
         await pool.close();
         process.exit(0);
     } catch (err) {
-        console.error('❌ Error al conectar:');
+        console.error('Error al conectar:');
         console.error(err.message);
         if (err.message.includes('IP address')) {
             console.error('\nCONSEJO: Parece que tu IP no está autorizada en el Firewall de Azure.');
