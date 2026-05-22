@@ -49,11 +49,6 @@ const getEmprendimientos = async (req, res) => {
       offset: parseInt(req.query.offset) || 0
     };
 
-    // If user is not admin, only show their own emprendimientos
-    if (req.user && req.user.rol_nombre !== 'admin') {
-      filters.id_usuario = req.user.id_usuario;
-    }
-
     const emprendimientos = await Emprendimiento.findAll(filters);
     const total = await Emprendimiento.count({ 
       id_categoria: filters.id_categoria,
