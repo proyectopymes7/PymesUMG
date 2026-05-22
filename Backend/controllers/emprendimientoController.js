@@ -86,10 +86,9 @@ const getEmprendimientoById = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (req.user && req.user.rol_nombre !== 'admin' && 
-        emprendimiento.id_usuario !== req.user.id_usuario && 
-        emprendimiento.estado !== 'activo') {
+    // Block access to non-approved businesses for non-owners and non-admins
+    if (emprendimiento.estado !== 'APROBADO' &&
+        (!req.user || (req.user.rol_nombre !== 'admin' && emprendimiento.id_usuario !== req.user.id_usuario))) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You do not have permission to view this emprendimiento'
