@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
-import { getBusinessById } from '../data/mockData'
+import { getBusinessById } from '../services/businessService'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,8 +14,12 @@ const mapUrl = computed(() => {
   return `https://maps.google.com/maps?q=${query}&output=embed`
 })
 
-onMounted(() => {
-  business.value = getBusinessById(route.params.id)
+onMounted(async () => {
+  try {
+    business.value = await getBusinessById(route.params.id)
+  } catch (error) {
+    console.error('Error fetching business details:', error)
+  }
 })
 
 const goBack = () => {

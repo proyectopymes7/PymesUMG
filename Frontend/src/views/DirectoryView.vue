@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
-import { getAllBusinesses, getCategories } from '../data/mockData'
+import { getAllBusinesses, getCategories } from '../services/businessService'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,10 +22,17 @@ const updateView = () => {
   if (isDesktop.value) isFilterOpen.value = true
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('resize', updateView)
   updateView()
   if (route.query.q) searchKeyword.value = route.query.q
+
+  try {
+    allBusinesses.value = await getAllBusinesses()
+    categories.value = await getCategories()
+  } catch (error) {
+    console.error('Error fetching directory data:', error)
+  }
 })
 
 // BASE DE DATOS COMPLETA
@@ -65,7 +72,7 @@ const municipalities = computed(() => {
   return ['Todas', ...locationsData[selectedDept.value]]
 })
 
-const allBusinesses = ref(getAllBusinesses())
+const allBusinesses = ref([])
 
 const normalize = (str) => {
   if (!str) return ''
@@ -85,7 +92,7 @@ const filteredBusinesses = computed(() => {
   })
 })
 
-const categories = getCategories()
+const categories = ref([])
 const toggleFilters = () => { if (!isDesktop.value) isFilterOpen.value = !isFilterOpen.value }
 </script>
 
