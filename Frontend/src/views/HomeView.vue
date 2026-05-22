@@ -4,19 +4,15 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
 import heroBgImage from '../assets/images/hero_bg.png'
-import { getFeaturedBusinesses } from '../data/mockData'
-
+import { getFeaturedBusinesses } from '../services/businessService'
 const router = useRouter()
 const searchCategory = ref('Ubicación')
 const searchKeyword = ref('')
 const searchLocation = ref('')
 const currentCarouselIndex = ref(0)
 
-// Featured data — sorted by reviewCount from centralized mock
-const featuredBusinesses = ref(getFeaturedBusinesses(5).map(b => ({
-  id: b.id, name: b.name, category: b.category, rating: b.rating,
-  description: b.description, location: b.location, image: b.image
-})))
+// Featured data — fetched from backend API
+const featuredBusinesses = ref([])
 
 // Carousel Logic
 const nextCard = () => { currentCarouselIndex.value = (currentCarouselIndex.value + 1) % featuredBusinesses.value.length }
@@ -42,7 +38,13 @@ const triggerSearch = () => {
 
 // Scroll Reveal Logic
 const revealedElements = ref(new Set());
-onMounted(() => {
+onMounted(async () => {
+  try {
+    featuredBusinesses.value = await getFeaturedBusinesses(5)
+  } catch (err) {
+    console.error('Error fetching featured businesses:', err)
+  }
+
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {

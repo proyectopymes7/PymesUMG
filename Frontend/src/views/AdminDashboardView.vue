@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import Navbar from '../components/layout/Navbar.vue'
-import { getAllBusinesses, getPendingBusinesses, updateBusinessStatus, getAllUsers, updateUserRole } from '../data/mockData'
+import { getAllBusinesses, getPendingBusinesses, updateBusinessStatus, getAllUsers, updateUserRole } from '../services/businessService'
 
 const authStore = useAuthStore()
 const activeTab = ref('requests')
@@ -11,15 +11,15 @@ const allBusinesses = ref([])
 const allUsers = ref([])
 const loading = ref(false)
 
-const fetchData = () => {
+const fetchData = async () => {
   loading.value = true
   try {
     if (activeTab.value === 'requests') {
-      pendingRequests.value = getPendingBusinesses()
+      pendingRequests.value = await getPendingBusinesses()
     } else if (activeTab.value === 'businesses') {
-      allBusinesses.value = getAllBusinesses()
+      allBusinesses.value = await getAllBusinesses()
     } else if (activeTab.value === 'users') {
-      allUsers.value = getAllUsers()
+      allUsers.value = await getAllUsers()
     }
   } catch (err) {
     console.error('Error fetching admin data:', err)
@@ -28,17 +28,27 @@ const fetchData = () => {
   }
 }
 
-const handleAction = (id, action) => {
+const handleAction = async (id, action) => {
   const estado = action === 'approve' ? 'activo' : 'inactivo'
-  updateBusinessStatus(id, estado)
-  fetchData()
-  alert(`Negocio ${action === 'approve' ? 'aprobado' : 'rechazado'} con éxito`)
+  try {
+    await updateBusinessStatus(id, estado)
+    await fetchData()
+    alert(`Negocio ${action === 'approve' ? 'aprobado' : 'rechazado'} con éxito`)
+  } catch (error) {
+    console.error(error)
+    alert('Error al procesar la acción')
+  }
 }
 
-const changeUserRole = (userId, newRoleId) => {
-  updateUserRole(userId, newRoleId)
-  fetchData()
-  alert('Rol de usuario actualizado')
+const changeUserRole = async (userId, newRoleId) => {
+  try {
+    await updateUserRole(userId, newRoleId)
+    await fetchData()
+    alert('Rol de usuario actualizado')
+  } catch (error) {
+    console.error(error)
+    alert('Error al cambiar el rol')
+  }
 }
 
 onMounted(fetchData)
@@ -91,6 +101,42 @@ onMounted(fetchData)
               <button @click="handleAction(req.id, 'reject')" class="bg-fiery-red hover:bg-fiery-darkred text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-fiery-red/20 transition-all">Rechazar</button>
             </div>
           </div>
+        </div>
+
+        <!-- Businesses Tab -->
+        <div v-else-if="activeTab === 'businesses'" class="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-slate-50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+                <th class="px-8 py-5">Negocio</th>
+                <th class="px-8 py-5">Categoría</th>
+                <th class="px-8 py-5">Estado</th>
+                <th class="px-8 py-5 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-50">
+              <tr v-for="business in allBusinesses" :key="business.id" class="hover:bg-slate-50 transition-colors">
+                <td class="px-8 py-5">
+                  <div class="flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-100">
+                      <img :src="business.image" class="w-full h-full object-cover" />
+                    </div>
+                    <span class="text-sm font-bold text-fiery-navy uppercase tracking-tighter">{{ business.name }}</span>
+                  </div>
+                </td>
+                <td class="px-8 py-5 text-sm text-slate-500 font-bold uppercase text-[10px]">{{ business.category }}</td>
+                <td class="px-8 py-5">
+                  <span :class="[business.status === 'APROBADO' || business.status === 'activo' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600', 'px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest']">
+                    {{ business.status }}
+                  </span>
+                </td>
+                <td class="px-8 py-5 text-right flex gap-2 justify-end">
+                  <button @click="handleAction(business.id, 'reject')" class="text-[10px] font-black text-fiery-red hover:text-fiery-darkred uppercase tracking-widest">Desactivar</button>
+                  <button @click="handleAction(business.id, 'approve')" class="text-[10px] font-black text-emerald-600 hover:text-emerald-800 uppercase tracking-widest">Activar</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- Users Tab (Super Admin Only) -->
