@@ -23,7 +23,9 @@ const { connectDB } = require('./config/database');
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginOpenerPolicy: false
+}))
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -50,12 +52,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/api/test-users', async (req, res) => {
+  const pool = await connectDB()
+  const result = await pool.request().query('SELECT id_usuario, nombre, correo, id_rol FROM Usuarios')
+  res.json(result.recordset)
+})
+
 // Database connection test endpoint
 app.get('/api/test-db', async (req, res) => {
   try {
     const pool = await connectDB();
     const result = await pool.request().query('SELECT @@VERSION as version');
-    
+
     res.status(200).json({
       status: 'success',
       message: 'Conexión exitosa a Azure SQL',

@@ -1,9 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const logger = require('../utils/logger');
 
 const generateToken = (userId) => {
@@ -173,20 +171,21 @@ const login = async (req, res) => {
 
 const googleLogin = async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { access_token } = req.body;
 
-    if (!idToken) {
-      return res.status(400).json({ error: 'idToken is required' });
+    if (!access_token) {
+      return res.status(400).json({ error: 'access_token is required' });
     }
 
-    // Verify Google Token
-    const ticket = await client.verifyIdToken({
-      idToken: idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+    const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` }
     });
 
-    const payload = ticket.getPayload();
-    const { email, given_name, family_name, picture } = payload;
+    if (!googleRes.ok) {
+      return res.status(401).json({ error: 'Invalid Google access token' });
+    }
+
+    const { email, given_name, family_name } = await googleRes.json();
 
     // Check if user exists
     let user = await User.findByEmail(email);
