@@ -7,9 +7,9 @@ const mapBusinessData = (b) => {
     name: b.nombre,
     category: b.categoria_nombre || 'General',
     rating: b.rating_promedio ? Number(b.rating_promedio).toFixed(1) : 4.5,
-    reviewCount: b.vistas || 0, // Using vistas as review count placeholder
+    reviewCount: b.vistas || 0,
     description: b.descripcion,
-    dept: 'Guatemala', // Fallbacks since DB lacks these
+    dept: 'Guatemala',
     muni: 'Guatemala',
     barrio: 'Zona 1',
     location: b.direccion || 'Guatemala',
@@ -87,7 +87,6 @@ export const getCategories = async () => {
   try {
     const response = await api.get('/categories');
     if (response.data.success && response.data.data) {
-      // Map to array of names for current frontend logic, though returning objects might be better later
       return ['Todas', ...response.data.data.map(c => c.nombre)];
     }
     return ['Todas', 'Restaurantes', 'Salud', 'Servicios', 'Tecnología', 'Belleza', 'Comercio'];
@@ -103,6 +102,57 @@ export const updateBusinessStatus = async (id, estado) => {
     return response.data;
   } catch (error) {
     console.error(`Error updating business ${id} status to ${estado}:`, error);
+    throw error;
+  }
+};
+
+export const updateBusinessData = async (businessId, data) => {
+  try {
+    const response = await api.put(`/emprendimientos/${businessId}`, data);
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating business ${businessId}:`, error);
+    throw error;
+  }
+};
+
+export const getBusinessImages = async (businessId) => {
+  try {
+    const response = await api.get(`/imagenes/emprendimiento/${businessId}`);
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error(`Error fetching images for business ${businessId}:`, error);
+    return [];
+  }
+};
+
+export const uploadBusinessImage = async (businessId, file) => {
+  try {
+    let url = file;
+    if (file instanceof File) {
+      url = URL.createObjectURL(file);
+    }
+    const response = await api.post('/imagenes/emprendimiento', {
+      id_emprendimiento: businessId,
+      url: url,
+      orden: 0
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading business image:', error);
+    throw error;
+  }
+};
+
+export const deleteBusinessImage = async (imageId) => {
+  try {
+    const response = await api.delete(`/imagenes/emprendimiento/${imageId}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error deleting image ${imageId}:`, error);
     throw error;
   }
 };
@@ -125,6 +175,33 @@ export const updateUserRole = async (userId, newRoleId) => {
   return { id_usuario: userId, id_rol: newRoleId };
 };
 
+export const getBusinessReviews = async (businessId) => {
+  try {
+    const response = await api.get(`/valoraciones/emprendimiento/${businessId}`);
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error(`Error fetching reviews for business ${businessId}:`, error);
+    return [];
+  }
+};
+
+export const createReview = async ({ id_emprendimiento, comentario, calificacion }) => {
+  try {
+    const response = await api.post('/valoraciones', {
+      id_emprendimiento,
+      comentario,
+      calificacion
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error creating review:', error);
+    throw error;
+  }
+};
+
 export default {
   getAllBusinesses,
   getFeaturedBusinesses,
@@ -132,6 +209,12 @@ export default {
   getPendingBusinesses,
   getCategories,
   updateBusinessStatus,
+  updateBusinessData,
+  getBusinessImages,
+  uploadBusinessImage,
+  deleteBusinessImage,
   getAllUsers,
-  updateUserRole
+  updateUserRole,
+  getBusinessReviews,
+  createReview
 };
