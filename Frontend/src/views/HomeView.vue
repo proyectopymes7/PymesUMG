@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
-import heroBgImage from '../assets/images/hero_bg.png'
+import alfombra from '@/assets/alfombra.webp'
 import { getFeaturedBusinesses, getCategories } from '../services/businessService'
 
 const router = useRouter()
@@ -84,7 +84,6 @@ onMounted(async () => {
 
   try {
     const cats = await getCategories()
-    // getCategories returns ['Todas', ...names], remove 'Todas' for dropdown
     categories.value = cats.filter(c => c !== 'Todas')
   } catch (err) {
     categories.value = ['Restaurantes', 'Salud', 'Servicios', 'Tecnología', 'Belleza', 'Comercio']
@@ -115,12 +114,12 @@ onUnmounted(() => {
     <Navbar />
 
     <!-- ═══ HERO ═══ -->
-    <section class="relative pt-32 pb-48 lg:pt-40 lg:pb-64 bg-slate-900">
+    <section class="relative pt-32 pb-48 lg:pt-40 lg:pb-64">
       <div class="absolute inset-0 z-0 overflow-hidden">
-        <img :src="heroBgImage" class="absolute inset-0 w-full h-full object-cover opacity-40 mix-blend-overlay" />
-        <div class="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900/90 to-slate-900/40"></div>
+        <img :src="alfombra" class="absolute inset-0 w-full h-full object-cover" alt="" />
+        <div class="absolute inset-0" style="background:rgba(0,18,8,.80);"></div>
         <div class="absolute bottom-0 left-0 w-full leading-none z-10 translate-y-[1px]">
-          <svg viewBox="0 0 1440 320" preserveAspectRatio="none" class="relative block w-full h-[120px] md:h-[320px]">
+          <svg viewBox="0 0 1440 320" preserveAspectRatio="none" class="relative block w-full h-[120px] md:h-[320px] z-10">
             <path fill="#ffffff" d="M0,120 C450,450 900,-250 1440,180 L1440,320 L0,320 Z"></path>
           </svg>
         </div>
@@ -128,12 +127,12 @@ onUnmounted(() => {
 
       <div class="container mx-auto px-6 relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
         <div class="text-left">
-          <div class="inline-block px-4 py-2 bg-purple-500/20 border border-purple-500/30 rounded-full text-purple-300 font-semibold text-xs mb-6 backdrop-blur-sm uppercase tracking-widest">Directorio de Negocios PYME</div>
+          <div class="hero-badge">Directorio de Negocios PYME</div>
           <h1 class="text-5xl md:text-7xl font-black text-white mb-6 leading-[1.1] font-outfit uppercase tracking-tighter">
             Descubre<br/>
-            <span class="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">Negocios cerca</span>
+            <span class="text-fiery-red">Negocios cerca</span>
           </h1>
-          <p class="text-slate-300 text-lg md:text-xl max-w-xl mb-10 leading-relaxed font-light">
+          <p class="text-cream-muted text-lg md:text-xl max-w-xl mb-10 leading-relaxed font-light">
             Encuentra los mejores negocios, servicios y productos cerca de ti. Apoya a los emprendedores y descubre lo que tu ciudad tiene para ofrecer.
           </p>
         </div>
@@ -150,14 +149,14 @@ onUnmounted(() => {
         <!-- Search box -->
         <div class="flex-1 w-full">
           <!-- Tabs -->
-          <div class="absolute -top-5 left-6 flex bg-purple-700 p-1.5 rounded-full shadow-lg z-20">
+          <div class="absolute -top-5 left-6 flex search-tabs p-1.5 rounded-full shadow-lg z-20">
             <button
               @click="searchCategory = 'Negocio'"
-              :class="[searchCategory === 'Negocio' ? 'bg-purple-600 text-white shadow-md' : 'text-purple-200', 'px-5 py-1.5 rounded-full text-xs font-bold transition-all']"
+              :class="[searchCategory === 'Negocio' ? 'tab-active' : 'tab-inactive', 'px-5 py-1.5 rounded-full text-xs font-bold transition-all']"
             >Negocio</button>
             <button
               @click="searchCategory = 'Ubicación'"
-              :class="[searchCategory === 'Ubicación' ? 'bg-purple-600 text-white shadow-md' : 'text-purple-200', 'px-5 py-1.5 rounded-full text-xs font-bold transition-all']"
+              :class="[searchCategory === 'Ubicación' ? 'tab-active' : 'tab-inactive', 'px-5 py-1.5 rounded-full text-xs font-bold transition-all']"
             >Ubicación</button>
           </div>
 
@@ -185,7 +184,7 @@ onUnmounted(() => {
                   <button
                     v-for="cat in categories" :key="cat"
                     @click="selectCategory(cat)"
-                    class="w-full text-left px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                    class="w-full text-left px-5 py-3 text-sm font-semibold text-slate-700 dropdown-item transition-colors first:rounded-t-2xl last:rounded-b-2xl"
                   >{{ cat }}</button>
                 </div>
               </div>
@@ -211,7 +210,7 @@ onUnmounted(() => {
                   <button
                     v-for="dep in departments" :key="dep"
                     @click="selectDepartment(dep)"
-                    class="w-full text-left px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-purple-50 hover:text-purple-700 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                    class="w-full text-left px-5 py-3 text-sm font-semibold text-slate-700 dropdown-item transition-colors first:rounded-t-2xl last:rounded-b-2xl"
                   >{{ dep }}</button>
                 </div>
               </div>
@@ -220,15 +219,15 @@ onUnmounted(() => {
 
             <button
               @click="triggerSearch"
-              class="w-full md:w-auto bg-purple-600 hover:bg-purple-700 text-white px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg shadow-purple-500/30 transition-all active:scale-95 self-center"
+              class="btn-search w-full md:w-auto px-10 py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all active:scale-95 self-center"
             >Buscar</button>
           </div>
         </div>
 
-        <!-- CTA a la par del search bar -->
+        <!-- CTA -->
         <button
           @click="$router.push('/register')"
-          class="cta-negocio w-full md:w-auto bg-fiery-red hover:bg-fiery-darkred text-white px-7 py-5 rounded-[2rem] font-black uppercase tracking-widest text-xs shadow-xl shadow-fiery-red/30 transition-all active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap mt-0 md:mt-6"
+          class="cta-negocio w-full md:w-auto px-7 py-5 rounded-[2rem] font-black uppercase tracking-widest text-xs transition-all active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap mt-0 md:mt-6"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
           ¿Tienes un negocio?
@@ -245,7 +244,7 @@ onUnmounted(() => {
           :class="revealedElements.has('reveal-0') ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'"
         >
           <div class="text-center md:text-left mb-8 md:mb-0">
-            <h4 class="text-purple-600 font-black uppercase tracking-[0.3em] text-xs mb-3">Recomendados</h4>
+            <h4 class="eyebrow-red font-black uppercase tracking-[0.3em] text-xs mb-3">Recomendados</h4>
             <h2 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit uppercase tracking-tighter leading-none">Negocios <span class="text-fiery-red">Destacados</span></h2>
           </div>
           <div class="flex gap-4">
@@ -277,7 +276,7 @@ onUnmounted(() => {
     <!-- ═══ CÓMO FUNCIONA ═══ -->
     <section class="py-32 bg-white relative overflow-hidden">
       <div class="absolute inset-0 z-0 pointer-events-none">
-        <div class="absolute top-0 right-0 w-[40%] h-[40%] bg-purple-50 rounded-full blur-[120px] opacity-40"></div>
+        <div class="absolute top-0 right-0 w-[40%] h-[40%] how-deco-1 rounded-full blur-[120px] opacity-40"></div>
         <div class="absolute bottom-0 left-0 w-[40%] h-[40%] bg-fiery-red/5 rounded-full blur-[120px] opacity-40"></div>
       </div>
 
@@ -289,8 +288,8 @@ onUnmounted(() => {
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-24 lg:gap-32 max-w-6xl mx-auto">
           <div class="relative reveal-on-scroll transition-all duration-1000 delay-100 group" :class="revealedElements.has('reveal-3') ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'">
-            <div class="absolute -inset-8 bg-purple-400/20 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-            <div class="absolute -top-16 -left-8 text-[12rem] font-black text-slate-50 leading-none z-0 pointer-events-none select-none group-hover:text-purple-100 transition-colors duration-500">1</div>
+            <div class="absolute -inset-8 how-glow-navy rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div class="absolute -top-16 -left-8 text-[12rem] font-black how-num-bg leading-none z-0 pointer-events-none select-none transition-colors duration-500">1</div>
             <div class="relative z-10">
               <div class="mb-8 rounded-[2.5rem] overflow-hidden shadow-2xl group-hover:-translate-y-4 transition-transform duration-500 border-4 border-white">
                 <img src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800&auto=format&fit=crop" class="w-full h-72 object-cover" alt="Busca">
@@ -302,7 +301,7 @@ onUnmounted(() => {
 
           <div class="relative reveal-on-scroll transition-all duration-1000 delay-300 group" :class="revealedElements.has('reveal-4') ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'">
             <div class="absolute -inset-8 bg-fiery-red/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-            <div class="absolute -top-16 -left-8 text-[12rem] font-black text-slate-50 leading-none z-0 pointer-events-none select-none group-hover:text-fiery-red/5 transition-colors duration-500">2</div>
+            <div class="absolute -top-16 -left-8 text-[12rem] font-black how-num-bg leading-none z-0 pointer-events-none select-none transition-colors duration-500">2</div>
             <div class="relative z-10">
               <div class="mb-8 rounded-[2.5rem] overflow-hidden shadow-2xl group-hover:-translate-y-4 transition-transform duration-500 border-4 border-white">
                 <img src="https://images.unsplash.com/photo-1552664730-d307ca884978?q=80&w=800&auto=format&fit=crop" class="w-full h-72 object-cover" alt="Compara">
@@ -313,8 +312,8 @@ onUnmounted(() => {
           </div>
 
           <div class="relative reveal-on-scroll transition-all duration-1000 delay-500 group" :class="revealedElements.has('reveal-5') ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'">
-            <div class="absolute -inset-8 bg-blue-400/10 rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-            <div class="absolute -top-16 -left-8 text-[12rem] font-black text-slate-50 leading-none z-0 pointer-events-none select-none group-hover:text-blue-50 transition-colors duration-500">3</div>
+            <div class="absolute -inset-8 how-glow-blue rounded-full blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
+            <div class="absolute -top-16 -left-8 text-[12rem] font-black how-num-bg leading-none z-0 pointer-events-none select-none transition-colors duration-500">3</div>
             <div class="relative z-10">
               <div class="mb-8 rounded-[2.5rem] overflow-hidden shadow-2xl group-hover:-translate-y-4 transition-transform duration-500 border-4 border-white">
                 <img src="https://images.unsplash.com/photo-1556761175-b413da4baf72?q=80&w=800&auto=format&fit=crop" class="w-full h-72 object-cover" alt="Conecta">
@@ -327,9 +326,9 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- ═══ FOOTER CTA (solo fondo morado, sin contenido) ═══ -->
-    <section class="py-16 bg-slate-900 relative overflow-hidden">
-      <div class="absolute inset-0 bg-gradient-to-r from-purple-900/40 to-pink-900/40 opacity-50"></div>
+    <!-- ═══ FOOTER BAND ═══ -->
+    <section class="py-16 relative overflow-hidden footer-band">
+      <div class="absolute inset-0 footer-band-overlay"></div>
     </section>
 
   </div>
@@ -341,11 +340,83 @@ onUnmounted(() => {
 .animate-float { animation: float 6s ease-in-out infinite; }
 .reveal-on-scroll { will-change: transform, opacity; }
 
-/* Dropdown scroll aislado — no propaga al body */
+/* ── PALETA DEL PROYECTO ───────────────────────── */
+/* Navy: #003049 | Rojo: #C1121F | Crema: #FDF0D5 | Celeste: #669BBC | DarkRed: #780000 */
+
+/* Hero */
+.hero-bg-color { background-color: #003049; }
+.hero-badge {
+  display: inline-block;
+  padding: .4rem 1rem;
+  background: rgba(193,18,31,.18);
+  border: 1px solid rgba(193,18,31,.35);
+  border-radius: 999px;
+  color: #FDF0D5;
+  font-size: .65rem; font-weight: 900;
+  text-transform: uppercase; letter-spacing: .2em;
+  margin-bottom: 1.5rem;
+}
+.text-cream-muted { color: rgba(253,240,213,.75); }
+
+/* Ola con alfombra — mismo estilo que how-section del Blog */
+.wave-img-wrap {
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wave-alfombra {
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.wave-overlay { display: none; }
+
+/* Tabs del buscador */
+.search-tabs { background: #C1121F; }
+.tab-active  { background: #780000; color: #FDF0D5; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.tab-inactive { color: rgba(253,240,213,.65); }
+
+/* Botón buscar */
+.btn-search {
+  background: #C1121F;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(193,18,31,.3);
+}
+.btn-search:hover { background: #780000; }
+
+/* Dropdown items */
+.dropdown-item:hover { background: #FDF0D5; color: #C1121F; }
+
+/* CTA negocio */
+.cta-negocio {
+  background: #003049;
+  color: #FDF0D5;
+  box-shadow: 0 4px 20px rgba(0,48,73,.3);
+}
+.cta-negocio:hover { background: #669BBC; color: #fff; }
+
+/* Eyebrow destacados — crema */
+.eyebrow-red { color: #FDF0D5; }
+
+/* Cómo funciona — decoraciones */
+.how-deco-1    { background: rgba(102,155,188,.15); }
+.how-glow-navy { background: rgba(0,48,73,.15); }
+.how-glow-blue { background: rgba(102,155,188,.15); }
+.how-num-bg    { color: #f1f5f9; }
+
+/* Footer band */
+.footer-band         { background: #003049; }
+.footer-band-overlay { background: rgba(193,18,31,.12); }
+
+/* Dropdown scroll */
 .cat-scroll, .dep-scroll {
   max-height: 15rem;
   overflow-y: auto;
-  overscroll-behavior: contain; /* ← clave: evita que el scroll escape al body */
+  overscroll-behavior: contain;
 }
 .cat-scroll::-webkit-scrollbar,
 .dep-scroll::-webkit-scrollbar { width: 4px; }

@@ -1,22 +1,12 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import Navbar from '../components/layout/Navbar.vue'
-import arcoAntigua from '@/assets/fontabella.jpg'
+import arcoAntigua from '@/assets/fontabella.webp'
 import umgLogo from '@/assets/UMG.png'
-import paisaje from '@/assets/alfombra.jpg'
-import mercado from '@/assets/mercado.jpg'
-
-let parallaxEl = null
-
-const handleScroll = () => {
-  if (!parallaxEl) return
-  parallaxEl.style.transform = `translateY(${window.scrollY * 0.2}px)`
-}
+import paisaje from '@/assets/alfombra.webp'
+import mercado from '@/assets/mercado.webp'
 
 onMounted(() => {
-  document.documentElement.style.scrollBehavior = 'smooth'
-  parallaxEl = document.querySelector('.parallax-img')
-  window.addEventListener('scroll', handleScroll, { passive: true })
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
@@ -28,7 +18,7 @@ onMounted(() => {
   document.querySelectorAll('.reveal').forEach(el => observer.observe(el))
 })
 
-onUnmounted(() => { window.removeEventListener('scroll', handleScroll) })
+onUnmounted(() => {})
 
 const pillars = [
   { icon: `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"/>`, label: 'Ingeniería en Sistemas', bg: '#003049' },
@@ -72,15 +62,15 @@ const whyReasons = [
       <!-- HERO -->
       <section class="hero-section">
         <div class="container">
-          <div class="reveal fade-up d0 eyebrow-wrap">
+          <div class="eyebrow-wrap">
             <span class="eyebrow-line"></span>
             <span class="eyebrow-text">AquiTenes</span>
             <span class="eyebrow-line"></span>
           </div>
-          <h1 class="reveal fade-up d1 hero-title">
+          <h1 class="hero-title">
             Nuestra<br><span class="hero-accent">Historia</span>
           </h1>
-          <p class="reveal fade-up d2 hero-sub">
+          <p class="hero-sub">
             Una plataforma creada para apoyar a los pequeños emprendedores de Guatemala.
           </p>
           <div class="scroll-hint">
@@ -96,7 +86,7 @@ const whyReasons = [
           <div class="reveal fade-up d0 badge-wrap">
             <span class="glass-badge">Colaboración Académica</span>
           </div>
-          <div class="reveal fade-up d1 mission-card">
+          <div class="mission-card">
             <div class="mission-grid">
               <div class="mission-text">
                 <h2 class="mission-heading">
@@ -105,14 +95,12 @@ const whyReasons = [
                   <span style="color:#FDF0D5;">Estrategia</span>
                 </h2>
                 <p class="mission-body">
-                  AquiTenes es una aplicación desarrollada por estudiantes de
+                  Desarrollada por estudiantes de
                   <strong style="color:#fff;">Ingeniería en Sistemas</strong> con el apoyo de
                   <strong style="color:#fff;">Administración de Empresas con énfasis en Mercadotecnia</strong>.
                 </p>
                 <p class="mission-body-sec">
-                  Nació de la sinergia entre el rigor técnico y la visión comercial, creando una herramienta
-                  diseñada para potenciar la economía local guatemalteca y visibilizar a los pequeños
-                  emprendedores de Guatemala.
+                  Una herramienta para potenciar la economía local guatemalteca y visibilizar a los pequeños emprendedores.
                 </p>
                 <div class="umg-mini-wrap">
                   <p class="umg-mini-label">Apoyado por</p>
@@ -141,7 +129,11 @@ const whyReasons = [
     <!-- FIN PARALLAX -->
 
     <!-- CÓMO FUNCIONA -->
-    <section class="how-section" :style="{ backgroundImage: `url(${paisaje})` }">
+    <section class="how-section">
+      <div class="how-bg-wrap" aria-hidden="true">
+        <div class="how-bg" :style="{ backgroundImage: `url(${paisaje})` }"></div>
+        <div class="how-overlay"></div>
+      </div>
       <div class="container">
         <div class="sec-header">
           <div class="reveal fade-up d0 badge-red">¿Qué es AquiTenes?</div>
@@ -150,9 +142,8 @@ const whyReasons = [
           </h2>
         </div>
         <div class="how-grid">
-          <div
+          <div class="how-card"
             v-for="(step, i) in howItWorks" :key="i"
-            class="reveal fade-up how-card"
             :style="{ transitionDelay: (i * 100) + 'ms' }"
           >
             <div class="how-num" :style="{ color: step.color }">{{ step.num }}</div>
@@ -165,7 +156,11 @@ const whyReasons = [
     </section>
 
     <!-- IMPACTO SOCIAL -->
-    <section class="impact-section" :style="{ backgroundImage: `url(${mercado})` }">
+    <section class="impact-section">
+      <div class="impact-bg-wrap" aria-hidden="true">
+        <div class="impact-bg" :style="{ backgroundImage: `url(${mercado})` }"></div>
+        <div class="impact-overlay"></div>
+      </div>
       <div class="container">
         <div class="impact-grid">
           <div class="reveal fade-left d0 quote-side">
@@ -173,7 +168,7 @@ const whyReasons = [
               Cada emprendimiento visible es una familia que crece.
             </blockquote>
           </div>
-          <div class="reveal fade-right d1 impact-list">
+          <div class="impact-list">
             <div v-for="(item, i) in impactItems" :key="i" class="impact-item">
               <div class="impact-dot"></div>
               <div>
@@ -238,26 +233,24 @@ const whyReasons = [
 .page-root { min-height:100vh; background:#fff; overflow-x:hidden; font-family:'Outfit',sans-serif; }
 .container { max-width:72rem; margin:0 auto; padding:0 1.5rem; }
 
-/* Scroll y rendering suave */
+/* Rendering suave */
 * { -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
-section { transform:translateZ(0); backface-visibility:hidden; }
 
-/* REVEAL */
-.reveal { transition:opacity .5s cubic-bezier(0.22,1,0.36,1), transform .5s cubic-bezier(0.22,1,0.36,1); }
-.fade-up    { opacity:0; transform:translateY(20px); }
-.fade-left  { opacity:0; transform:translateX(-20px); }
-.fade-right { opacity:0; transform:translateX(20px); }
+/* REVEAL — solo fade, sin movimiento para evitar saltos */
+.reveal { transition:opacity .55s cubic-bezier(0.25,1,0.4,1), transform .55s cubic-bezier(0.25,1,0.4,1); }
+.fade-up    { opacity:0; transform:translateY(8px); }
+.fade-left  { opacity:0; transform:translateX(-8px); }
+.fade-right { opacity:0; transform:translateX(8px); }
 .reveal.is-revealed { opacity:1!important; transform:none!important; }
-.d0{transition-delay:0ms}.d1{transition-delay:70ms}.d2{transition-delay:140ms}
+.d0{transition-delay:0ms}.d1{transition-delay:60ms}.d2{transition-delay:120ms}
 
 /* PARALLAX */
 .parallax-block { position:relative; isolation:isolate; }
 .parallax-bg-wrap { position:absolute; inset:0; overflow:hidden; z-index:0; }
 .parallax-img {
-  position:absolute; top:-15%; left:0;
-  width:100%; height:130%;
+  position:absolute; top:0; left:0;
+  width:100%; height:100%;
   object-fit:cover; object-position:center 30%;
-  will-change:transform;
 }
 .parallax-overlay {
   position:absolute; inset:0;
@@ -276,69 +269,46 @@ section { transform:translateZ(0); backface-visibility:hidden; }
 .hero-section { position:relative; z-index:1; padding:6rem 0 4rem; text-align:center; }
 .eyebrow-wrap { display:inline-flex; align-items:center; gap:.75rem; margin-bottom:1.5rem; }
 .eyebrow-line { display:block; width:2rem; height:1px; background:#ff6b6b; }
-.eyebrow-text {
-  color:#ff6b6b;
-  font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.25em;
-  text-shadow:0 1px 6px rgba(0,0,0,.9);
-}
-.hero-title {
-  font-size:clamp(2.5rem,7vw,6rem); font-weight:900; color:#fff;
-  text-transform:uppercase; letter-spacing:-.04em; line-height:1; margin-bottom:1.25rem;
-  text-shadow:0 2px 20px rgba(0,0,0,.8);
-}
+.eyebrow-text { color:#ff6b6b; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.25em; text-shadow:0 1px 6px rgba(0,0,0,.9); }
+.hero-title { font-size:clamp(2.5rem,7vw,6rem); font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:-.04em; line-height:1; margin-bottom:1.25rem; text-shadow:0 2px 20px rgba(0,0,0,.8); }
 .hero-accent { color:#ff4444; text-shadow:0 0 40px rgba(193,18,31,.7), 0 2px 20px rgba(0,0,0,.9); }
-.hero-sub {
-  color:#fff;
-  font-size:clamp(.95rem,2vw,1.25rem); max-width:34rem; margin:0 auto;
-  font-weight:600; line-height:1.65;
-  text-shadow:0 2px 12px rgba(0,0,0,.95);
-}
+.hero-sub { color:#fff; font-size:clamp(.95rem,2vw,1.25rem); max-width:34rem; margin:0 auto; font-weight:600; line-height:1.65; text-shadow:0 2px 12px rgba(0,0,0,.95); }
 .scroll-hint  { margin-top:3rem; display:flex; flex-direction:column; align-items:center; gap:.5rem; opacity:.6; }
-.sh-label {
-  color:#fff; font-size:.6rem; font-weight:900; text-transform:uppercase; letter-spacing:.25em;
-  text-shadow:0 1px 6px rgba(0,0,0,.8);
-}
+.sh-label { color:#fff; font-size:.6rem; font-weight:900; text-transform:uppercase; letter-spacing:.25em; text-shadow:0 1px 6px rgba(0,0,0,.8); }
 .sh-line  { width:1px; height:2.5rem; background:linear-gradient(to bottom,rgba(255,255,255,.8),transparent); animation:pulse 2s ease-in-out infinite; }
 @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
 
 /* MISIÓN */
-.mission-section { position:relative; z-index:1; padding:1rem 0 7rem; }
+.mission-section { position:relative; z-index:1; padding:1rem 0 5rem; }
 .badge-wrap  { text-align:center; margin-bottom:3rem; }
 .glass-badge { display:inline-block; padding:.5rem 1.25rem; border-radius:999px; border:1px solid rgba(255,100,100,.5); color:#ff6b6b; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.2em; backdrop-filter:blur(10px); background:rgba(0,0,0,.2); }
-.mission-card { border-radius:2.5rem; overflow:hidden; background:rgba(255,255,255,.06); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.12); box-shadow:0 40px 80px rgba(0,0,0,.4); }
+.mission-card { border-radius:2rem; overflow:hidden; background:rgba(255,255,255,.06); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 60px rgba(0,0,0,.4); }
 .mission-grid { display:grid; grid-template-columns:1fr; }
-@media(min-width:768px){.mission-grid{grid-template-columns:1fr 1fr}}
-.mission-text     { padding:3rem 3.5rem; display:flex; flex-direction:column; justify-content:center; }
-.mission-heading  { font-size:clamp(1.75rem,3.5vw,2.75rem); font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:-.03em; line-height:1.05; margin-bottom:1.5rem; }
-.mission-body     { color:rgba(255,240,220,.85); font-size:1rem; line-height:1.75; font-weight:500; margin-bottom:1rem; }
-.mission-body-sec { color:rgba(255,240,220,.60); font-size:.875rem; line-height:1.75; }
-.umg-mini-wrap  { margin-top:2rem; padding-top:2rem; border-top:1px solid rgba(255,255,255,.1); }
-.umg-mini-label { color:rgba(255,240,220,.40); font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.2em; margin-bottom:1rem; }
-.umg-mini-badge { display:inline-flex; align-items:center; gap:1rem; padding:1rem 1.5rem; border-radius:1rem; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); backdrop-filter:blur(10px); }
-.umg-mini-logo  { height:2.5rem; width:auto; object-fit:contain; filter:brightness(1.1); }
-.umg-mini-name  { color:#fff; font-size:.8rem; font-weight:900; text-transform:uppercase; letter-spacing:.08em; line-height:1.3; font-family:'Outfit',sans-serif; }
-.pillars-side   { padding:3rem 3.5rem; display:flex; flex-direction:column; justify-content:center; border-top:1px solid rgba(255,255,255,.08); }
+@media(min-width:768px){.mission-grid{grid-template-columns:1.4fr 1fr}}
+.mission-text     { padding:2rem 2.5rem; display:flex; flex-direction:column; justify-content:center; }
+.mission-heading  { font-size:clamp(1.4rem,2.5vw,2rem); font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:-.03em; line-height:1.05; margin-bottom:1rem; }
+.mission-body     { color:rgba(255,240,220,.85); font-size:.875rem; line-height:1.65; font-weight:500; margin-bottom:.75rem; }
+.mission-body-sec { color:rgba(255,240,220,.55); font-size:.8rem; line-height:1.65; }
+.umg-mini-wrap  { margin-top:1.25rem; padding-top:1.25rem; border-top:1px solid rgba(255,255,255,.1); }
+.umg-mini-label { color:rgba(255,240,220,.38); font-size:.6rem; font-weight:900; text-transform:uppercase; letter-spacing:.2em; margin-bottom:.75rem; }
+.umg-mini-badge { display:inline-flex; align-items:center; gap:.75rem; padding:.75rem 1rem; border-radius:.875rem; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14); backdrop-filter:blur(10px); transition:transform .28s ease, box-shadow .28s ease, background .28s ease; cursor:default; }
+.umg-mini-badge:hover { transform:scale(1.04) translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.4); background:rgba(255,255,255,.13); }
+.umg-mini-logo  { height:2rem; width:auto; object-fit:contain; filter:brightness(1.1); }
+.umg-mini-name  { color:#fff; font-size:.7rem; font-weight:900; text-transform:uppercase; letter-spacing:.06em; line-height:1.3; font-family:'Outfit',sans-serif; }
+.pillars-side   { padding:1.5rem 2rem; display:flex; flex-direction:column; justify-content:center; border-top:1px solid rgba(255,255,255,.08); }
 @media(min-width:768px){.pillars-side{border-top:none;border-left:1px solid rgba(255,255,255,.08)}}
-.pillars-label { color:rgba(255,240,220,.35); font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.2em; margin-bottom:1.5rem; }
-.pillars-grid  { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-.pillar-card   { aspect-ratio:1; border-radius:1.25rem; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1rem; text-align:center; box-shadow:0 8px 24px rgba(0,0,0,.3); transition:transform .3s ease,box-shadow .3s ease; }
-.pillar-card:hover { transform:scale(1.06) translateY(-3px); box-shadow:0 16px 40px rgba(0,0,0,.4); }
-.pillar-icon  { width:1.75rem; height:1.75rem; color:rgba(255,255,255,.9); margin-bottom:.75rem; }
+.pillars-label { color:rgba(255,240,220,.35); font-size:.55rem; font-weight:900; text-transform:uppercase; letter-spacing:.2em; margin-bottom:.75rem; }
+.pillars-grid  { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+.pillar-card   { aspect-ratio:1; border-radius:.875rem; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:.5rem; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.3); transition:transform .28s ease,box-shadow .28s ease; }
+.pillar-card:hover { transform:scale(1.04) translateY(-2px); box-shadow:0 8px 20px rgba(0,0,0,.4); }
+.pillar-icon  { width:1.25rem; height:1.25rem; color:rgba(255,255,255,.9); margin-bottom:.4rem; }
 .pillar-label { font-size:.6rem; font-weight:900; text-transform:uppercase; letter-spacing:.07em; color:#fff; line-height:1.35; }
 
 /* CÓMO FUNCIONA */
-.how-section {
-  padding:8rem 0;
-  background-size:cover;
-  background-position:center 40%;
-  background-attachment:fixed;
-  position:relative;
-}
-.how-section::before {
-  content:''; position:absolute; inset:0;
-  background:rgba(0,18,8,.80);
-  z-index:0;
-}
+.how-section { padding:8rem 0; position:relative; overflow:hidden; }
+.how-bg-wrap { position:absolute; inset:0; overflow:hidden; z-index:0; }
+.how-bg { position:absolute; top:0; left:0; width:100%; height:100%; background-size:cover; background-position:center; }
+.how-overlay { position:absolute; inset:0; background:rgba(0,18,8,.82); }
 .how-section .container { position:relative; z-index:1; }
 .sec-header  { text-align:center; margin-bottom:5rem; }
 .how-heading { color:#fff !important; text-shadow:0 2px 10px rgba(0,0,0,.5); }
@@ -348,32 +318,19 @@ section { transform:translateZ(0); backface-visibility:hidden; }
 .sec-heading.white{color:#fff}
 .how-grid  { display:grid; grid-template-columns:1fr; gap:2rem; max-width:62rem; margin:0 auto; }
 @media(min-width:768px){.how-grid{grid-template-columns:repeat(3,1fr)}}
-.how-card  {
-  background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.13);
-  border-radius:2rem; padding:2.5rem; display:flex; flex-direction:column;
-  backdrop-filter:blur(14px); box-shadow:0 8px 32px rgba(0,0,0,.3);
-  transition:transform .4s ease,box-shadow .4s ease,background .3s ease;
-}
+.how-card  { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.13); border-radius:2rem; padding:2.5rem; display:flex; flex-direction:column; backdrop-filter:blur(14px); box-shadow:0 8px 32px rgba(0,0,0,.3); transition:transform .35s cubic-bezier(0.22,1,0.36,1), box-shadow .35s ease, background .25s ease; }
 .how-card:hover{transform:translateY(-8px);box-shadow:0 24px 60px rgba(0,0,0,.45);background:rgba(255,255,255,.12)}
 .how-num   { font-size:4rem; font-weight:900; line-height:1; margin-bottom:1.25rem; }
 .how-title { font-size:1.5rem; font-weight:900; text-transform:uppercase; letter-spacing:-.02em; margin-bottom:1rem; color:#fff; }
 .how-desc  { color:rgba(255,255,255,.70); font-size:.875rem; line-height:1.75; flex:1; }
-.how-bar   { height:3px; border-radius:999px; width:0; margin-top:1.5rem; background:var(--bar-color); transition:width .5s ease; }
+.how-bar   { height:3px; border-radius:999px; width:0; margin-top:1.5rem; background:var(--bar-color); transition:width .4s ease; }
 .how-card:hover .how-bar{width:100%}
 
 /* IMPACTO */
-.impact-section {
-  padding:8rem 0;
-  background-size:cover;
-  background-position:center;
-  background-attachment:fixed;
-  position:relative;
-}
-.impact-section::before {
-  content:''; position:absolute; inset:0;
-  background:rgba(0,0,0,.75);
-  z-index:0;
-}
+.impact-section { padding:8rem 0; position:relative; overflow:hidden; }
+.impact-bg-wrap { position:absolute; inset:0; overflow:hidden; z-index:0; }
+.impact-bg { position:absolute; top:0; left:0; width:100%; height:100%; background-size:cover; background-position:center; }
+.impact-overlay { position:absolute; inset:0; background:rgba(0,0,0,.76); }
 .impact-section .container { position:relative; z-index:1; }
 .impact-grid { max-width:72rem; margin:0 auto; display:grid; grid-template-columns:1fr; gap:4rem; align-items:center; }
 @media(min-width:768px){.impact-grid{grid-template-columns:1fr 1fr;gap:5rem}}
