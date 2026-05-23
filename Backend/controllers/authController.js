@@ -22,7 +22,7 @@ const register = async (req, res) => {
       });
     }
 
-    const { nombre, apellido, correo, password, id_rol = 2 } = req.body; // Default to regular user role
+    const { nombre, apellido, correo, password, id_rol = 4 } = req.body; // Default: Visitante
 
     // Check if user already exists
     const existingUser = await User.findByEmail(correo);
@@ -196,8 +196,8 @@ const googleLogin = async (req, res) => {
         nombre: given_name || 'Usuario',
         apellido: family_name || 'Google',
         correo: email,
-        password_hash: 'GOOGLE_AUTH_ACCOUNT', // Placeholder since it's Google Auth
-        id_rol: 2, // Default role
+        password_hash: 'GOOGLE_AUTH_ACCOUNT',
+        id_rol: 4, // Default: Visitante
         activo: 1
       };
       

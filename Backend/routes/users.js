@@ -54,6 +54,21 @@ router.get('/:id', auth, authorize('admin'), async (req, res) => {
   }
 });
 
+router.put('/:id/role', auth, authorize('superadministrador'), async (req, res) => {
+  try {
+    const { id_rol } = req.body;
+    if (![1, 2, 3, 4].includes(id_rol)) {
+      return res.status(400).json({ error: 'Invalid role', message: 'id_rol must be 1, 2, 3, or 4' });
+    }
+    await User.updateRole(req.params.id, id_rol);
+    const updatedUser = await User.findById(req.params.id);
+    delete updatedUser.password_hash;
+    res.json({ success: true, message: 'Role updated successfully', data: updatedUser });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update role', message: 'Internal server error' });
+  }
+});
+
 router.put('/:id/status', auth, authorize('admin'), async (req, res) => {
   try {
     const { activo } = req.body;

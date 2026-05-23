@@ -51,8 +51,8 @@ const router = createRouter({
 
 router.beforeEach((to) => {
   const authStore = useAuthStore()
-  if (to.path.startsWith('/admin') && !authStore.isAdmin) {
-    return '/login'
+  if (to.path.startsWith('/admin') && !authStore.hasAdminPanel) {
+    return authStore.isAuthenticated ? '/' : '/login'
   }
   if ((to.path === '/login' || to.path === '/register') && authStore.isAuthenticated) {
     return '/'

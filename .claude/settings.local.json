@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "PowerShell(Get-Process -Id 28040)"
+      "PowerShell(Get-Process -Id 28040)",
+      "Bash(curl -s http://localhost:3000/api/test-users)",
+      "Bash(python3 -c \"import sys,json; users=json.load\\(sys.stdin\\); [print\\(u\\) for u in users if 'rudytest' in u.get\\('correo',''\\)]\")",
+      "Bash(node scratch/make-superadmin.js)",
+      "Bash(node -e ' *)",
+      "Bash(npm install *)",
+      "Bash(netstat -ano)",
+      "Bash(npm start *)",
+      "Bash(curl -s http://localhost:3000/health)"
     ]
   }
 }

@@ -21,8 +21,11 @@ export const useAuthStore = defineStore('auth', {
 
   getters: {
     isAuthenticated: (state) => !!state.token,
+    isSuperAdmin: (state) => state.user?.id_rol === 1,
     isAdmin: (state) => state.user?.id_rol === 1 || state.user?.id_rol === 2,
-    isUser: (state) => state.user?.id_rol === 3 || state.user?.id_rol === 4,
+    isEmprendedor: (state) => state.user?.id_rol === 3,
+    isVisitante: (state) => state.user?.id_rol === 4,
+    hasAdminPanel: (state) => state.user?.id_rol === 1 || state.user?.id_rol === 2 || state.user?.id_rol === 3,
     userName: (state) => state.user ? `${state.user.nombre}` : '',
     userFullName: (state) => state.user ? `${state.user.nombre} ${state.user.apellido}` : '',
     userInitial: (state) => state.user?.nombre ? state.user.nombre.charAt(0).toUpperCase() : '?'

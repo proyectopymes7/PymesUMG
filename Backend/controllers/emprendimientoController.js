@@ -1,6 +1,10 @@
 const { body, validationResult } = require('express-validator');
 const Emprendimiento = require('../models/Emprendimiento');
+const User = require('../models/User');
 const logger = require('../utils/logger');
+
+const isAdmin = (user) => user && (user.id_rol === 1 || user.id_rol === 2);
+const isOwner = (user, emp) => user && user.id_usuario === emp.id_usuario;
 
 const createEmprendimiento = async (req, res) => {
   try {
@@ -86,9 +90,7 @@ const getEmprendimientoById = async (req, res) => {
       });
     }
 
-    // Block access to non-approved businesses for non-owners and non-admins
-    if (emprendimiento.estado !== 'APROBADO' &&
-        (!req.user || (req.user.rol_nombre !== 'admin' && emprendimiento.id_usuario !== req.user.id_usuario))) {
+    if (emprendimiento.estado !== 'APROBADO' && !isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You do not have permission to view this emprendimiento'
@@ -133,8 +135,7 @@ const updateEmprendimiento = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (req.user.rol_nombre !== 'admin' && emprendimiento.id_usuario !== req.user.id_usuario) {
+    if (!isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You can only update your own emprendimientos'
@@ -142,6 +143,16 @@ const updateEmprendimiento = async (req, res) => {
     }
 
     const updateData = req.body;
+
+    // Auto-promote Visitante (4) → Emprendedor (3) when business is approved
+    if (updateData.estado === 'APROBADO') {
+      const owner = await User.findById(emprendimiento.id_usuario);
+      if (owner && owner.id_rol === 4) {
+        await User.updateRole(emprendimiento.id_usuario, 3);
+        logger.info(`User promoted to Emprendedor: ${owner.correo}`);
+      }
+    }
+
     const updatedEmprendimiento = await Emprendimiento.update(id, updateData);
 
     logger.info(`Emprendimiento updated: ${emprendimiento.nombre}`, { 
@@ -175,8 +186,7 @@ const deleteEmprendimiento = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (req.user.rol_nombre !== 'admin' && emprendimiento.id_usuario !== req.user.id_usuario) {
+    if (!isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You can only delete your own emprendimientos'
@@ -362,7 +372,7 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['activo', 'inactivo', 'pendiente'])
-      .withMessage('Estado must be activo, inactivo, or pendiente')
+      .isIn(['APROBADO', 'BORRADOR', 'PENDIENTE', 'RECHAZADO'])
+      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO')
   ]
 };

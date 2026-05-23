@@ -170,9 +170,27 @@ export const getAllUsers = async () => {
   }
 };
 
+export const getMyBusinesses = async () => {
+  try {
+    const response = await api.get('/emprendimientos/my/emprendimientos');
+    if (response.data.success && response.data.data) {
+      return response.data.data.map(mapBusinessData);
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching my businesses:', error);
+    return [];
+  }
+};
+
 export const updateUserRole = async (userId, newRoleId) => {
-  console.warn('updateUserRole is mocked, backend endpoint missing');
-  return { id_usuario: userId, id_rol: newRoleId };
+  try {
+    const response = await api.put(`/users/${userId}/role`, { id_rol: newRoleId });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    throw error;
+  }
 };
 
 export const getBusinessReviews = async (businessId) => {

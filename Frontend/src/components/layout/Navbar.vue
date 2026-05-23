@@ -60,7 +60,7 @@ const handleLogout = () => {
         <RouterLink to="/" class="hover:text-fiery-red transition-colors relative group py-2">Inicio</RouterLink>
         <RouterLink to="/directorio" class="hover:text-fiery-red transition-colors relative group py-2">Directorio</RouterLink>
         <RouterLink to="/blog" class="hover:text-fiery-red transition-colors relative group py-2">Blog</RouterLink>
-        <RouterLink v-if="authStore.isAdmin" to="/admin" class="text-fiery-red hover:text-fiery-darkred transition-colors relative group py-2 flex items-center gap-2">
+        <RouterLink v-if="authStore.hasAdminPanel" to="/admin" class="text-fiery-red hover:text-fiery-darkred transition-colors relative group py-2 flex items-center gap-2">
           <span class="w-2 h-2 bg-fiery-red rounded-full animate-pulse"></span>
           Admin
         </RouterLink>
@@ -111,7 +111,7 @@ const handleLogout = () => {
         <RouterLink @click="isMenuOpen = false" to="/" class="text-xl font-black">Inicio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/directorio" class="text-xl font-black">Directorio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/blog" class="text-xl font-black">Blog</RouterLink>
-        <RouterLink v-if="authStore.isAdmin" @click="isMenuOpen = false" to="/admin" class="text-xl font-black text-fiery-red">Panel Admin</RouterLink>
+        <RouterLink v-if="authStore.hasAdminPanel" @click="isMenuOpen = false" to="/admin" class="text-xl font-black text-fiery-red">Panel Admin</RouterLink>
         
         <div v-if="authStore.isAuthenticated" class="w-full flex flex-col items-center border-t pt-6">
           <p class="font-black mb-4">{{ authStore.userFullName }}</p>
