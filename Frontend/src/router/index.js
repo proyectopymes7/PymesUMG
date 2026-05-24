@@ -7,6 +7,7 @@ import AdminDashboardView from '../views/AdminDashboardView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import { useAuthStore } from '../stores/auth'
+import ImageUploadTestView from '../views/ImageUploadTestView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -45,6 +46,11 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: RegisterView
+    },
+    {
+      path: '/test-upload',
+      name: 'test-upload',
+      component: ImageUploadTestView
     }
   ]
 })
