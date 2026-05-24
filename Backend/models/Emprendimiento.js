@@ -5,11 +5,13 @@ class Emprendimiento {
     const query = `
       INSERT INTO Emprendimientos (
         id_usuario, id_categoria, nombre, descripcion, telefono, whatsapp,
-        latitud, longitud, horario, vistas, destacado, estado, fecha_registro
+        latitud, longitud, horario, vistas, destacado, estado,
+        departamento, municipio, localidad, direccion, fecha_registro
       )
       VALUES (
         @id_usuario, @id_categoria, @nombre, @descripcion, @telefono, @whatsapp,
-        @latitud, @longitud, @horario, @vistas, @destacado, @estado, GETDATE()
+        @latitud, @longitud, @horario, @vistas, @destacado, @estado,
+        @departamento, @municipio, @localidad, @direccion, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as id_emprendimiento;
     `;
@@ -24,9 +26,13 @@ class Emprendimiento {
       { name: 'latitud', value: emprendimientoData.latitud, type: sql.Decimal },
       { name: 'longitud', value: emprendimientoData.longitud, type: sql.Decimal },
       { name: 'horario', value: emprendimientoData.horario, type: sql.VarChar },
-      { name: 'vistas', value: emprendimientoData.vistas || 0, type: sql.Int },
-      { name: 'destacado', value: emprendimientoData.destacado || 0, type: sql.Bit },
-      { name: 'estado', value: emprendimientoData.estado || 'activo', type: sql.VarChar }
+      { name: 'vistas',       value: emprendimientoData.vistas || 0,                    type: sql.Int },
+      { name: 'destacado',    value: emprendimientoData.destacado || 0,                 type: sql.Bit },
+      { name: 'estado',       value: emprendimientoData.estado || 'PENDIENTE',          type: sql.VarChar },
+      { name: 'departamento', value: emprendimientoData.departamento || null,           type: sql.NVarChar },
+      { name: 'municipio',    value: emprendimientoData.municipio || null,              type: sql.NVarChar },
+      { name: 'localidad',    value: emprendimientoData.localidad || null,              type: sql.NVarChar },
+      { name: 'direccion',    value: emprendimientoData.direccion || null,              type: sql.NVarChar },
     ];
 
     try {

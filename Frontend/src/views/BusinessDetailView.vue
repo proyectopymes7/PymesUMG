@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
+import LocationPicker from '../components/shared/LocationPicker.vue'
 import { getBusinessById, getBusinessReviews, createReview } from '../services/businessService'
 import { useAuthStore } from '../stores/auth'
  
@@ -18,9 +19,33 @@ const submittingReview = ref(false)
 const reviewError = ref('')
 const reviewSuccess = ref(false)
  
+const hasCoords = computed(() => !!(business.value?.lat && business.value?.lng))
+
+const locationData = computed(() => {
+  if (!business.value) return {}
+  return {
+    lat: business.value.lat,
+    lng: business.value.lng,
+    departamento: business.value.departamento,
+    municipio: business.value.municipio,
+    localidad: business.value.localidad,
+    direccion: business.value.location
+  }
+})
+
+const mapsLink = computed(() => {
+  if (!business.value) return 'https://maps.google.com'
+  if (hasCoords.value) return `https://www.google.com/maps?q=${business.value.lat},${business.value.lng}`
+  return `https://www.google.com/maps/search/${encodeURIComponent(business.value.location || business.value.name)}`
+})
+
 const mapUrl = computed(() => {
   if (!business.value) return ''
-  const query = encodeURIComponent(business.value.location)
+  if (hasCoords.value) {
+    const key = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+    return `https://www.google.com/maps/embed/v1/place?key=${key}&q=${business.value.lat},${business.value.lng}&zoom=16`
+  }
+  const query = encodeURIComponent(business.value.location || business.value.name)
   return `https://maps.google.com/maps?q=${query}&output=embed`
 })
  
@@ -238,11 +263,12 @@ const submitReview = async () => {
                 <svg class="w-5 h-5 md:w-6 md:h-6 text-fiery-red" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                 Ubicación
               </h3>
-              <div class="w-full h-40 md:h-48 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border-2 border-white/10 bg-slate-100">
+              <LocationPicker v-if="hasCoords" :model-value="locationData" :readonly="true" />
+              <div v-else class="w-full h-40 md:h-48 rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border-2 border-white/10 bg-slate-100">
                 <iframe :src="mapUrl" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
               </div>
               <p class="text-fiery-cream/80 font-medium text-[11px] md:text-xs text-center md:text-left">{{ business.location }}</p>
-              <a href="https://maps.google.com" target="_blank" class="flex items-center justify-center gap-2 w-full py-3.5 bg-white text-fiery-navy rounded-xl md:rounded-2xl font-black text-sm hover:bg-fiery-red hover:text-white transition-all shadow-md">
+              <a :href="mapsLink" target="_blank" class="flex items-center justify-center gap-2 w-full py-3.5 bg-white text-fiery-navy rounded-xl md:rounded-2xl font-black text-sm hover:bg-fiery-red hover:text-white transition-all shadow-md">
                 Abrir Maps
               </a>
             </div>

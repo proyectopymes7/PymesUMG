@@ -332,7 +332,11 @@ module.exports = {
     body('estado')
       .optional()
       .isIn(['APROBADO', 'BORRADOR', 'PENDIENTE', 'RECHAZADO'])
-      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO')
+      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO'),
+    body('departamento').optional().trim().isLength({ max: 100 }).withMessage('Departamento max 100 chars'),
+    body('municipio').optional().trim().isLength({ max: 100 }).withMessage('Municipio max 100 chars'),
+    body('localidad').optional().trim().isLength({ max: 150 }).withMessage('Localidad max 150 chars'),
+    body('direccion').optional().trim().isLength({ max: 300 }).withMessage('Dirección max 300 chars'),
   ],
   validateUpdateEmprendimiento: [
     body('nombre')
@@ -373,6 +377,10 @@ module.exports = {
     body('estado')
       .optional()
       .isIn(['APROBADO', 'BORRADOR', 'PENDIENTE', 'RECHAZADO'])
-      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO')
+      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO'),
+    body('departamento').optional().trim().isLength({ max: 100 }).withMessage('Departamento max 100 chars'),
+    body('municipio').optional().trim().isLength({ max: 100 }).withMessage('Municipio max 100 chars'),
+    body('localidad').optional().trim().isLength({ max: 150 }).withMessage('Localidad max 150 chars'),
+    body('direccion').optional().trim().isLength({ max: 300 }).withMessage('Dirección max 300 chars'),
   ]
 };

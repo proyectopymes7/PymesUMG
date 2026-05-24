@@ -136,8 +136,8 @@ onUnmounted(() => {
             Encuentra los mejores negocios, servicios y productos cerca de ti. Apoya a los emprendedores y descubre lo que tu ciudad tiene para ofrecer.
           </p>
         </div>
-        <div class="hidden lg:flex justify-end absolute right-0 bottom-[-220px] z-50 pointer-events-none w-[45%]">
-          <img src="../assets/images/emprendedor.png" class="w-full max-w-[500px] h-auto animate-float drop-shadow-2xl" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'" />
+        <div class="hidden lg:flex justify-end absolute right-0 bottom-[-230px] z-50 pointer-events-none w-[50%]">
+          <img src="../assets/images/emprendedores_gt.png" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'" />
         </div>
       </div>
     </section>
@@ -282,7 +282,7 @@ onUnmounted(() => {
 
       <div class="container mx-auto px-6 relative z-10">
         <div class="text-center mb-28 reveal-on-scroll transition-all duration-1000" :class="revealedElements.has('reveal-2') ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'">
-          <h4 class="text-fiery-red font-black uppercase tracking-[0.4em] text-xs mb-4">Experiencia AquiTenes</h4>
+          <h4 class="text-fiery-red font-black uppercase tracking-[0.4em] text-xs mb-4">Experiencia AquíTenes</h4>
           <h2 class="text-5xl md:text-7xl font-black text-fiery-navy font-outfit uppercase tracking-tighter">¿Cómo <span class="text-fiery-red">funciona</span>?</h2>
         </div>
 

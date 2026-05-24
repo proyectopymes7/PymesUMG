@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { getCategories } from '../../services/businessService'
-import api from '../../services/api' // Requirement: Direct api call
+import api from '../../services/api'
+import LocationPicker from '../shared/LocationPicker.vue'
 
 const props = defineProps({
   show: Boolean,
@@ -110,12 +111,20 @@ watch(() => props.show, async (newVal) => {
     productImagePreview.value = null
 
     // Make sure we safely initialize socials
-    formData.value = { 
+    formData.value = {
       ...props.business,
-      socials: { 
+      socials: {
         whatsapp: props.business.socials?.whatsapp || '',
         facebook: props.business.socials?.facebook || '',
         instagram: props.business.socials?.instagram || ''
+      },
+      locationData: {
+        lat: props.business.lat || null,
+        lng: props.business.lng || null,
+        departamento: props.business.departamento || '',
+        municipio: props.business.municipio || '',
+        localidad: props.business.localidad || '',
+        direccion: props.business.location || ''
       }
     }
     
@@ -173,15 +182,21 @@ const saveGeneral = async () => {
   updateScheduleString()
   
   try {
+    const loc = formData.value.locationData || {}
     const payload = {
       nombre: formData.value.name,
       descripcion: formData.value.description,
-      direccion: formData.value.location,
       categoria: formData.value.category,
       horario: formData.value.horario,
       whatsapp: formData.value.socials?.whatsapp,
       facebook: formData.value.socials?.facebook,
-      instagram: formData.value.socials?.instagram
+      instagram: formData.value.socials?.instagram,
+      departamento: loc.departamento || null,
+      municipio: loc.municipio || null,
+      localidad: loc.localidad || null,
+      direccion: loc.direccion || null,
+      latitud: loc.lat || null,
+      longitud: loc.lng || null
     }
     
     await api.put(`/emprendimientos/${props.business.id}`, payload)
@@ -349,11 +364,11 @@ const executeDelete = async (id) => {
               <textarea v-model="formData.description" rows="3" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-600 focus:outline-none focus:border-fiery-red transition-all"></textarea>
             </div>
 
-            <div>
-              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Dirección</label>
-              <input v-model="formData.location" type="text" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-fiery-navy font-bold focus:outline-none focus:border-fiery-red transition-all" />
+            <div class="md:col-span-2">
+              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Ubicación en el mapa</label>
+              <LocationPicker v-model="formData.locationData" />
             </div>
-            
+
             <div>
               <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Categoría</label>
               <select v-model="formData.category" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-fiery-navy font-bold focus:outline-none focus:border-fiery-red transition-all">

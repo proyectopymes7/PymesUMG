@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import umgLogo from '../../assets/UMG.png'
 
 const route = useRoute()
 const isMenuOpen = ref(false)
@@ -47,11 +48,7 @@ const handleLogout = () => {
     <div class="max-w-7xl mx-auto flex items-center justify-between">
       <!-- Logo -->
       <RouterLink to="/" class="flex items-center gap-3 group">
-        <div class="w-10 h-10 md:w-12 md:h-12 bg-fiery-red rounded-xl flex items-center justify-center shadow-lg shadow-fiery-red/20 group-hover:rotate-12 transition-transform duration-500">
-          <svg class="w-6 h-6 md:w-7 md:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-          </svg>
-        </div>
+        <img :src="umgLogo" alt="UMG" class="w-10 h-10 md:w-12 md:h-12 object-contain" />
         <span class="font-black text-xl md:text-2xl tracking-tighter font-outfit uppercase">Aquí<span class="text-fiery-red">TENES</span></span>
       </RouterLink>
 
