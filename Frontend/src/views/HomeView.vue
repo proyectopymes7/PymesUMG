@@ -224,15 +224,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- CTA -->
-        <button
-          @click="$router.push('/register')"
-          class="cta-negocio w-full md:w-auto px-7 py-5 rounded-[2rem] font-black uppercase tracking-widest text-xs transition-all active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap mt-0 md:mt-6"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"/></svg>
-          ¿Tienes un negocio?
-        </button>
-
       </div>
     </section>
 
@@ -270,6 +261,48 @@ onUnmounted(() => {
             <BusinessCard :business="b" />
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ═══ EL DIRECTORIO DIGITAL ═══ -->
+    <section class="dir-section">
+      <div class="dir-bg-wrap" aria-hidden="true">
+        <img
+          src="https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=1600&auto=format&fit=crop"
+          class="dir-bg-img"
+          alt="Lago de Atitlán, Guatemala"
+        />
+        <div class="dir-overlay"></div>
+        <div class="dir-glow-red" aria-hidden="true"></div>
+      </div>
+
+      <div class="container mx-auto px-6 relative z-10 text-center max-w-3xl">
+
+        <!-- Eyebrow -->
+        <div class="dir-badge">¿Tienes un negocio?</div>
+
+        <!-- Heading -->
+        <h2 class="dir-heading">
+          Ponlo en el mapa<br>
+          <span class="dir-heading-accent">de Guatemala</span>
+        </h2>
+
+        <!-- Subtitle -->
+        <p class="dir-sub">
+          Miles de clientes buscan negocios como el tuyo todos los días.<br class="hidden md:block">
+          Regístralo gratis y empieza a recibir visitas hoy mismo.
+        </p>
+
+        <!-- Botón CTA -->
+        <button @click="$router.push('/register')" class="dir-cta-btn">
+          <span class="dir-cta-shine" aria-hidden="true"></span>
+          
+          Registrar mi negocio gratis
+          
+        </button>
+
+
+
       </div>
     </section>
 
@@ -326,11 +359,8 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <!-- ═══ FOOTER BAND ═══ -->
-    <section class="py-16 relative overflow-hidden footer-band">
-      <div class="absolute inset-0 footer-band-overlay"></div>
-    </section>
-
+    <!-- ═══ REGISTRA TU NEGOCIO ═══ -->
+    
   </div>
 </template>
 
@@ -399,8 +429,9 @@ onUnmounted(() => {
 }
 .cta-negocio:hover { background: #669BBC; color: #fff; }
 
-/* Eyebrow destacados — crema */
-.eyebrow-red { color: #FDF0D5; }
+/* Eyebrow destacados */
+.eyebrow-red  { color: #FDF0D5; }
+.eyebrow-blue { color: #669BBC; }
 
 /* Cómo funciona — decoraciones */
 .how-deco-1    { background: rgba(102,155,188,.15); }
@@ -426,5 +457,210 @@ onUnmounted(() => {
 /* CTA responsive */
 @media (max-width: 767px) {
   .cta-negocio { margin-top: 0.5rem; border-radius: 1.5rem; }
+}
+
+/* ── SECCIÓN EL DIRECTORIO DIGITAL ───────────── */
+.dir-section {
+  padding: 9rem 0 8rem;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 600px;
+}
+.dir-bg-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+.dir-bg-img {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center 55%;
+  transform: scale(1.04);
+}
+.dir-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    rgba(0,10,5,.88) 0%,
+    rgba(0,30,20,.82) 50%,
+    rgba(0,10,5,.90) 100%
+  );
+}
+.dir-glow-red {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 60% 35%, rgba(193,18,31,.18) 0%, transparent 65%);
+}
+
+/* Badge eyebrow */
+.dir-badge {
+  display: inline-block;
+  padding: .5rem 1.25rem;
+  border-radius: 999px;
+  background: rgba(193,18,31,.18);
+  border: 1px solid rgba(193,18,31,.35);
+  color: #ff8080;
+  font-size: .65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .22em;
+  margin-bottom: 1.75rem;
+}
+
+/* Heading */
+.dir-heading {
+  font-size: clamp(2.4rem, 6vw, 4.5rem);
+  font-weight: 900;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: -.04em;
+  line-height: 1;
+  font-family: 'Outfit', sans-serif;
+  text-shadow: 0 4px 24px rgba(0,0,0,.6);
+  margin-bottom: 1.5rem;
+}
+.dir-heading-accent {
+  color: #C1121F;
+  text-shadow: 0 0 40px rgba(193,18,31,.5), 0 4px 24px rgba(0,0,0,.6);
+}
+
+/* Subtitle */
+.dir-sub {
+  color: rgba(255,255,255,.62);
+  font-size: 1.05rem;
+  line-height: 1.75;
+  font-weight: 400;
+  margin-bottom: 3rem;
+}
+
+/* CTA Button */
+.dir-cta-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: .75rem;
+  padding: 1.1rem 2.25rem;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #C1121F 0%, #780000 100%);
+  color: #fff;
+  font-size: .9rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  font-family: 'Outfit', sans-serif;
+  box-shadow:
+    0 0 0 1px rgba(193,18,31,.4),
+    0 8px 32px rgba(193,18,31,.45),
+    0 20px 60px rgba(0,0,0,.35);
+  transition: transform .3s cubic-bezier(0.22,1,0.36,1), box-shadow .3s ease;
+}
+.dir-cta-btn:hover {
+  transform: translateY(-4px) scale(1.03);
+  box-shadow:
+    0 0 0 1px rgba(193,18,31,.5),
+    0 16px 48px rgba(193,18,31,.6),
+    0 28px 80px rgba(0,0,0,.4);
+}
+.dir-cta-btn:active { transform: translateY(-1px) scale(1); }
+
+/* Shimmer sweep */
+.dir-cta-shine {
+  position: absolute;
+  top: 0; left: -80%;
+  width: 55%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.25), transparent);
+  transform: skewX(-18deg);
+  transition: left .55s ease;
+  pointer-events: none;
+}
+.dir-cta-btn:hover .dir-cta-shine { left: 130%; }
+
+/* Arrow icon slide */
+.dir-cta-arrow {
+  transition: transform .3s ease;
+}
+.dir-cta-btn:hover .dir-cta-arrow { transform: translateX(4px); }
+
+/* Prueba social */
+.dir-proof {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: .6rem;
+  margin-top: 1.75rem;
+  color: rgba(255,255,255,.40);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+.dir-proof-dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #C1121F;
+  margin-right: .25rem;
+  animation: dir-pulse 2s ease-in-out infinite;
+}
+.dir-proof-sep { opacity: .4; }
+@keyframes dir-pulse {
+  0%, 100% { opacity: .5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.4); }
+}
+
+/* ── SECCIÓN REGISTRA TU NEGOCIO ──────────────── */
+.cta-bg {
+  background-color: #003049;
+}
+
+.cta-deco-1 {
+  background: #C1121F;
+}
+
+.cta-deco-2 {
+  background: #669BBC;
+}
+
+.cta-eyebrow {
+  background: rgba(193,18,31,.18);
+  border: 1px solid rgba(193,18,31,.35);
+  color: #FDF0D5;
+}
+
+.cta-btn {
+  background: #C1121F;
+  color: #fff;
+  box-shadow: 0 8px 32px rgba(193,18,31,.4);
+}
+.cta-btn:hover {
+  background: #780000;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(193,18,31,.5);
+}
+
+.cta-badge {
+  background: #fff;
+}
+
+.cta-img-overlay {
+  background: linear-gradient(to right, #003049 0%, rgba(0,48,73,.6) 50%, transparent 100%);
+}
+
+@media (max-width: 1023px) {
+  .cta-img-overlay {
+    background: linear-gradient(to top, #003049 0%, rgba(0,48,73,.4) 60%, transparent 100%);
+  }
 }
 </style>
