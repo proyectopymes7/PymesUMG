@@ -83,6 +83,37 @@ app.get('/api/test-db', async (req, res) => {
   }
 });
 
+// ── Temporal: migración categorías múltiples ──────────────
+app.get('/api/migrate-categories', async (req, res) => {
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmprendimientoCategorias')
+      CREATE TABLE EmprendimientoCategorias (
+        id_emprendimiento INT NOT NULL,
+        id_categoria      INT NOT NULL,
+        PRIMARY KEY (id_emprendimiento, id_categoria),
+        FOREIGN KEY (id_emprendimiento) REFERENCES Emprendimientos(id_emprendimiento) ON DELETE CASCADE,
+        FOREIGN KEY (id_categoria)      REFERENCES Categorias(id_categoria)           ON DELETE CASCADE
+      )
+    `);
+    await pool.request().query(`
+      INSERT INTO EmprendimientoCategorias (id_emprendimiento, id_categoria)
+      SELECT e.id_emprendimiento, e.id_categoria
+      FROM Emprendimientos e
+      WHERE e.id_categoria IS NOT NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM EmprendimientoCategorias ec
+          WHERE ec.id_emprendimiento = e.id_emprendimiento
+        )
+    `);
+    const r = await pool.request().query('SELECT COUNT(*) as total FROM EmprendimientoCategorias');
+    res.json({ success: true, total: r.recordset[0].total });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
@@ -108,10 +139,45 @@ app.use('*', (req, res) => {
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`Environment: ${process.env.NODE_ENV}`);
   console.log("http://localhost:3000/health");
+
+  // Ensure EmprendimientoCategorias junction table exists
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmprendimientoCategorias')
+      CREATE TABLE EmprendimientoCategorias (
+        id_emprendimiento INT NOT NULL,
+        id_categoria      INT NOT NULL,
+        PRIMARY KEY (id_emprendimiento, id_categoria),
+        FOREIGN KEY (id_emprendimiento) REFERENCES Emprendimientos(id_emprendimiento) ON DELETE CASCADE,
+        FOREIGN KEY (id_categoria)      REFERENCES Categorias(id_categoria)           ON DELETE CASCADE
+      )
+    `);
+    logger.info('EmprendimientoCategorias table ready');
+  } catch (err) {
+    logger.error('Failed to ensure EmprendimientoCategorias table:', err.message);
+  }
+
+  // Drop any CHECK constraint on estado so ACTIVO/INACTIVO are accepted
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      DECLARE @cn NVARCHAR(256)
+      SELECT @cn = cc.name
+      FROM sys.check_constraints cc
+      JOIN sys.columns c ON cc.parent_object_id = c.object_id AND cc.parent_column_id = c.column_id
+      WHERE cc.parent_object_id = OBJECT_ID('Emprendimientos') AND c.name = 'estado'
+      IF @cn IS NOT NULL
+        EXEC('ALTER TABLE Emprendimientos DROP CONSTRAINT [' + @cn + ']')
+    `);
+    logger.info('Estado constraint check done');
+  } catch (err) {
+    logger.error('Failed to drop estado constraint:', err.message);
+  }
 });
 
 module.exports = app;

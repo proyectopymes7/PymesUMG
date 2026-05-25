@@ -1,8 +1,7 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { useToastStore } from '../../stores/toast'
-// Mock API update until backend is confirmed
-// import { updateUserData } from '../../services/userService'
+import api from '../../services/api'
 
 const props = defineProps({
   show: Boolean,
@@ -49,22 +48,19 @@ const removeAvatar = () => {
 const saveUser = async () => {
   loading.value = true
   try {
-    // const payload = new FormData()
-    // Object.entries(formData.value).forEach(([k,v]) => {
-    //   if(v && k !== 'avatarFile') payload.append(k, v)
-    // })
-    // if(formData.value.avatarFile) payload.append('avatar', formData.value.avatarFile)
-    
-    // await updateUserData(props.user.id_usuario, payload)
-    
-    // Mock save delay
-    await new Promise(r => setTimeout(r, 800))
-    
+    const payload = {
+      nombre:   formData.value.nombre,
+      apellido: formData.value.apellido,
+      telefono: formData.value.telefono || undefined
+    }
+    const res = await api.put(`/users/${props.user.id_usuario}`, payload)
+    const updated = res.data?.data || formData.value
     toastStore.success('Usuario actualizado correctamente')
-    emit('saved', formData.value) // Pass updated data for local update
+    emit('saved', updated)
     emit('close')
   } catch (error) {
-    toastStore.error('Error al actualizar el usuario')
+    const msg = error.response?.data?.message || 'Error al actualizar el usuario'
+    toastStore.error(msg)
   } finally {
     loading.value = false
   }

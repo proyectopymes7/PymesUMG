@@ -13,7 +13,8 @@ const searchKeyword = ref('')
 const selectedDept = ref('Todas')
 const selectedMuni = ref('Todas')
 const searchBarrio = ref('')
-const selectedCategory = ref('Todas')
+const selectedCategories = ref([])
+const categoryDropdownOpen = ref(false)
 
 const isDesktop = ref(window.innerWidth >= 1024)
 const updateView = () => {
@@ -65,15 +66,26 @@ const normalize = (str) => {
   return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '').toLowerCase()
 }
 
+const toggleCategory = (cat) => {
+  if (cat === 'Todas') { selectedCategories.value = []; return }
+  const idx = selectedCategories.value.indexOf(cat)
+  if (idx >= 0) {
+    selectedCategories.value.splice(idx, 1)
+  } else {
+    selectedCategories.value.push(cat)
+  }
+}
+
 const filteredBusinesses = computed(() => {
   const keyword = normalize(searchKeyword.value)
   const barrioQuery = normalize(searchBarrio.value)
   return allBusinesses.value.filter(b => {
     const matchDept     = selectedDept.value === 'Todas' || normalize(b.dept) === normalize(selectedDept.value)
     const matchMuni     = selectedMuni.value === 'Todas' || normalize(b.muni) === normalize(selectedMuni.value)
-    const matchBarrio   = !barrioQuery || normalize(b.barrio).includes(barrioQuery)
-    const matchCategory = selectedCategory.value === 'Todas' || b.category === selectedCategory.value
-    const matchKeyword  = !keyword || normalize(b.name).includes(keyword) || normalize(b.category).includes(keyword) || normalize(b.description).includes(keyword)
+    const matchBarrio   = !barrioQuery || normalize(b.localidad).includes(barrioQuery)
+    const matchCategory = selectedCategories.value.length === 0 ||
+      selectedCategories.value.some(c => (b.categorias || [b.category]).map(normalize).includes(normalize(c)))
+    const matchKeyword  = !keyword || normalize(b.name).includes(keyword) || normalize(b.description).includes(keyword)
     return matchDept && matchMuni && matchBarrio && matchCategory && matchKeyword
   })
 })
@@ -85,7 +97,8 @@ const resetFilters = () => {
   selectedDept.value = 'Todas'
   selectedMuni.value = 'Todas'
   searchBarrio.value = ''
-  selectedCategory.value = 'Todas'
+  selectedCategories.value = []
+  categoryDropdownOpen.value = false
 }
 
 onMounted(async () => {
@@ -184,15 +197,56 @@ onMounted(async () => {
                 <!-- Categorías -->
                 <div class="pt-4 border-t border-slate-200">
                   <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Categorías</label>
-                  <div class="grid grid-cols-2 gap-2">
+
+                  <!-- Dropdown trigger -->
+                  <button
+                    @click="categoryDropdownOpen = !categoryDropdownOpen"
+                    class="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-fiery-navy focus:outline-none focus:border-fiery-red transition-all"
+                  >
+                    <span class="truncate">
+                      {{ selectedCategories.length === 0 ? 'Todas las categorías' : selectedCategories.join(', ') }}
+                    </span>
+                    <svg class="w-4 h-4 shrink-0 ml-2 transition-transform" :class="categoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </button>
+
+                  <!-- Dropdown list -->
+                  <div v-if="categoryDropdownOpen" class="mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
+                    <!-- Todas -->
                     <button
-                      v-for="cat in categories" :key="cat"
-                      @click="selectedCategory = cat"
-                      :class="[
-                        selectedCategory === cat ? 'bg-fiery-red text-white border-fiery-red' : 'bg-white text-slate-500 border-slate-100 hover:border-fiery-red/30',
-                        'px-2 py-2 rounded-xl text-[10px] font-black uppercase transition-all border'
-                      ]"
-                    >{{ cat }}</button>
+                      @click="toggleCategory('Todas')"
+                      :class="['w-full text-left px-4 py-2.5 text-xs font-bold transition-colors flex items-center gap-2',
+                        selectedCategories.length === 0 ? 'text-fiery-red bg-fiery-red/5' : 'text-slate-500 hover:bg-slate-50']"
+                    >
+                      <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                        :class="selectedCategories.length === 0 ? 'bg-fiery-red border-fiery-red' : 'border-slate-300'">
+                        <svg v-if="selectedCategories.length === 0" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                      </span>
+                      Todas
+                    </button>
+                    <button
+                      v-for="cat in categories.filter(c => c !== 'Todas')"
+                      :key="cat"
+                      @click="toggleCategory(cat)"
+                      :class="['w-full text-left px-4 py-2.5 text-xs font-bold transition-colors flex items-center gap-2 border-t border-slate-50',
+                        selectedCategories.includes(cat) ? 'text-fiery-red bg-fiery-red/5' : 'text-slate-600 hover:bg-slate-50']"
+                    >
+                      <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                        :class="selectedCategories.includes(cat) ? 'bg-fiery-red border-fiery-red' : 'border-slate-300'">
+                        <svg v-if="selectedCategories.includes(cat)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                      </span>
+                      {{ cat }}
+                    </button>
+                  </div>
+
+                  <!-- Tags seleccionadas -->
+                  <div v-if="selectedCategories.length > 0" class="flex flex-wrap gap-1.5 mt-2">
+                    <span
+                      v-for="cat in selectedCategories" :key="cat"
+                      class="flex items-center gap-1 px-2.5 py-1 bg-fiery-red/10 text-fiery-red rounded-full text-[10px] font-black uppercase"
+                    >
+                      {{ cat }}
+                      <button @click="toggleCategory(cat)" class="hover:text-fiery-darkred leading-none">×</button>
+                    </span>
                   </div>
                 </div>
 

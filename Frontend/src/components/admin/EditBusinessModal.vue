@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { getCategories } from '../../services/businessService'
+import { getRawCategories } from '../../services/businessService'
 import api from '../../services/api'
 import LocationPicker from '../shared/LocationPicker.vue'
 
@@ -28,6 +28,7 @@ const activeTab = ref('general')
 const loading = ref(false)
 const formData = ref({ socials: {} })
 const categories = ref([])
+const selectedCategorias = ref([])
 
 // Horarios state
 const daysMap = {
@@ -93,7 +94,7 @@ const handleKeydown = (e) => {
 }
 
 onMounted(async () => {
-  categories.value = await getCategories()
+  categories.value = await getRawCategories()
   window.addEventListener('keydown', handleKeydown)
 })
 
@@ -110,11 +111,13 @@ watch(() => props.show, async (newVal) => {
     productImageFile.value = null
     productImagePreview.value = null
 
-    // Make sure we safely initialize socials
+    // Strip https://wa.me/ prefix — backend stores/validates the raw number
+    const rawWhatsapp = (props.business.socials?.whatsapp || '').replace('https://wa.me/', '')
+
     formData.value = {
       ...props.business,
       socials: {
-        whatsapp: props.business.socials?.whatsapp || '',
+        whatsapp: rawWhatsapp,
         facebook: props.business.socials?.facebook || '',
         instagram: props.business.socials?.instagram || ''
       },
@@ -133,6 +136,11 @@ watch(() => props.show, async (newVal) => {
     selectedDays.value = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
     openTime.value = '8:00 AM'
     closeTime.value = '5:00 PM'
+    // categorias_ids comes from DB as a comma-separated string like "1,2,3"
+    const rawIds = props.business.categorias_ids
+    selectedCategorias.value = rawIds
+      ? String(rawIds).split(',').map(Number).filter(Boolean)
+      : []
   }
 })
 
@@ -147,7 +155,7 @@ const fetchProducts = async () => {
   loadingProducts.value = true
   try {
     const res = await api.get(`/productos/emprendimiento/${props.business.id}`)
-    products.value = res.data || []
+    products.value = res.data?.data || []
   } catch (error) {
     console.error('Error fetching products:', error)
   } finally {
@@ -182,44 +190,53 @@ const saveGeneral = async () => {
   updateScheduleString()
   
   try {
-    const loc = formData.value.locationData || {}
-    const payload = {
-      nombre: formData.value.name,
-      descripcion: formData.value.description,
-      categoria: formData.value.category,
-      horario: formData.value.horario,
-      whatsapp: formData.value.socials?.whatsapp,
-      facebook: formData.value.socials?.facebook,
-      instagram: formData.value.socials?.instagram,
-      departamento: loc.departamento || null,
-      municipio: loc.municipio || null,
-      localidad: loc.localidad || null,
-      direccion: loc.direccion || null,
-      latitud: loc.lat || null,
-      longitud: loc.lng || null
+    if (selectedCategorias.value.length === 0) {
+      showToast('Selecciona al menos una categoría', 'error')
+      loading.value = false
+      return
     }
-    
+
+    const loc = formData.value.locationData || {}
+
+    // Only send fields that have real values — empty strings break validators
+    const payload = {}
+    if (formData.value.name)        payload.nombre      = formData.value.name
+    if (formData.value.description) payload.descripcion = formData.value.description
+    payload.categorias = selectedCategorias.value
+    if (formData.value.horario)          payload.horario     = formData.value.horario
+    if (formData.value.socials?.whatsapp) payload.whatsapp   = formData.value.socials.whatsapp
+    if (loc.departamento) payload.departamento = loc.departamento
+    if (loc.municipio)    payload.municipio    = loc.municipio
+    if (loc.localidad)    payload.localidad    = loc.localidad
+    if (loc.direccion)    payload.direccion    = loc.direccion
+    if (loc.lat)          payload.latitud      = loc.lat
+    if (loc.lng)          payload.longitud     = loc.lng
+
     await api.put(`/emprendimientos/${props.business.id}`, payload)
-    
-    // Construir negocio actualizado para el state local
+
     const updatedBusiness = {
       ...props.business,
-      name: payload.nombre,
-      description: payload.descripcion,
-      location: payload.direccion,
-      category: payload.categoria,
-      horario: payload.horario,
-      socials: {
-        whatsapp: payload.whatsapp,
-        facebook: payload.facebook,
-        instagram: payload.instagram
-      }
+      name:         payload.nombre        ?? props.business.name,
+      description:  payload.descripcion   ?? props.business.description,
+      horario:      payload.horario       ?? props.business.horario,
+      socials: { ...props.business.socials, whatsapp: payload.whatsapp ?? props.business.socials?.whatsapp },
+      lat:          payload.latitud       ?? props.business.lat,
+      lng:          payload.longitud      ?? props.business.lng,
+      departamento: payload.departamento  ?? props.business.departamento,
+      municipio:    payload.municipio     ?? props.business.municipio,
+      localidad:    payload.localidad     ?? props.business.localidad,
+      location:     payload.direccion     ?? props.business.location,
     }
-    
+
     showToast('Negocio guardado exitosamente', 'success')
     emit('saved', updatedBusiness)
   } catch (error) {
-    const errorMsg = error.response?.data?.message || 'Error al guardar los cambios'
+    // Show the first validation detail if available, otherwise generic message
+    const details = error.response?.data?.details
+    const errorMsg = (Array.isArray(details) && details[0]?.msg)
+      ? `Campo inválido: ${details[0].msg}`
+      : error.response?.data?.error || error.response?.data?.message || 'Error al guardar los cambios'
+    console.error('Save error:', error.response?.data)
     showToast(errorMsg, 'error')
   } finally {
     loading.value = false
@@ -267,18 +284,16 @@ const saveProduct = async () => {
     } else {
       const payload = { ...productForm.value, id_emprendimiento: props.business.id }
       const res = await api.post(`/productos`, payload)
-      // Extraer ID del nuevo producto asumiendo varias estructuras de respuesta posibles
-      savedProductId = res.data?.id_producto || res.data?.id || res.data?.producto?.id_producto || res.data?.producto?.id
+      savedProductId = res.data?.data?.id_producto || res.data?.id_producto || res.data?.id
     }
 
     let imageFailed = false
     if (productImageFile.value && savedProductId) {
       try {
         const formData = new FormData()
-        formData.append('id_producto', savedProductId)
         formData.append('imagen', productImageFile.value)
-        
-        await api.post('/imagenes/producto', formData, {
+
+        await api.post(`/imagenes/producto/${savedProductId}`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         })
       } catch (imgError) {
@@ -332,7 +347,7 @@ const executeDelete = async (id) => {
   <div v-if="show" class="fixed inset-0 z-[200] flex items-start justify-center pt-[80px] px-4 pb-4">
     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" @click="emit('close')"></div>
     
-    <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[calc(100vh-96px)] flex flex-col relative shadow-2xl z-10 overflow-hidden mx-auto" tabindex="0">
+    <div class="bg-white rounded-3xl w-full max-w-2xl max-h-[calc(100vh-96px)] flex flex-col relative shadow-2xl z-10 mx-auto" tabindex="0">
       
       <!-- Header Sticky with Tabs -->
       <div class="bg-white sticky top-0 z-20 shrink-0 border-b border-slate-100 flex flex-col">
@@ -369,11 +384,30 @@ const executeDelete = async (id) => {
               <LocationPicker v-model="formData.locationData" />
             </div>
 
-            <div>
-              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Categoría</label>
-              <select v-model="formData.category" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-fiery-navy font-bold focus:outline-none focus:border-fiery-red transition-all">
-                <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-              </select>
+            <div class="md:col-span-2">
+              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
+                Categorías <span class="text-slate-300 font-normal normal-case">(mín. 1, máx. 3)</span>
+              </label>
+              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <button
+                  v-for="cat in categories"
+                  :key="cat.id_categoria"
+                  type="button"
+                  :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
+                  @click="selectedCategorias.includes(cat.id_categoria)
+                    ? selectedCategorias.splice(selectedCategorias.indexOf(cat.id_categoria), 1)
+                    : selectedCategorias.push(cat.id_categoria)"
+                  :class="[
+                    'px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all border text-left',
+                    selectedCategorias.includes(cat.id_categoria)
+                      ? 'bg-fiery-navy text-white border-fiery-navy'
+                      : 'bg-white text-slate-500 border-slate-200 hover:border-fiery-red hover:text-fiery-red',
+                    (!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3)
+                      ? 'opacity-40 cursor-not-allowed' : ''
+                  ]"
+                >{{ cat.nombre }}</button>
+              </div>
+              <p v-if="selectedCategorias.length === 0" class="text-[10px] text-red-400 font-bold mt-1">Selecciona al menos una categoría</p>
             </div>
           </div>
 
@@ -507,7 +541,7 @@ const executeDelete = async (id) => {
             <div v-for="prod in products" :key="prod.id_producto" class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center hover:border-slate-300 transition-colors relative">
               
               <div class="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center text-slate-300 border border-slate-200 shadow-inner hidden sm:flex">
-                <img v-if="prod.imagen" :src="prod.imagen" class="w-full h-full object-cover" />
+                <img v-if="prod.imagen_url" :src="prod.imagen_url" class="w-full h-full object-cover" />
                 <svg v-else class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
               </div>
 

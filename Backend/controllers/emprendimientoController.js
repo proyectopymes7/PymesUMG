@@ -47,14 +47,14 @@ const getEmprendimientos = async (req, res) => {
   try {
     const filters = {
       id_categoria: req.query.id_categoria,
-      estado: req.query.estado || 'APROBADO',
+      estado: req.query.estado === 'ALL' ? undefined : (req.query.estado || 'activo'),
       destacado: req.query.destacado === 'true' ? 1 : req.query.destacado === 'false' ? 0 : undefined,
       limit: parseInt(req.query.limit) || 50,
       offset: parseInt(req.query.offset) || 0
     };
 
     const emprendimientos = await Emprendimiento.findAll(filters);
-    const total = await Emprendimiento.count({ 
+    const total = await Emprendimiento.count({
       id_categoria: filters.id_categoria,
       estado: filters.estado
     });
@@ -169,7 +169,7 @@ const updateEmprendimiento = async (req, res) => {
     logger.error('Update emprendimiento error:', error);
     res.status(500).json({
       error: 'Failed to update emprendimiento',
-      message: 'Internal server error'
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -331,8 +331,8 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['APROBADO', 'BORRADOR', 'PENDIENTE', 'RECHAZADO'])
-      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO'),
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado'])
+      .withMessage('Estado inválido'),
     body('departamento').optional().trim().isLength({ max: 100 }).withMessage('Departamento max 100 chars'),
     body('municipio').optional().trim().isLength({ max: 100 }).withMessage('Municipio max 100 chars'),
     body('localidad').optional().trim().isLength({ max: 150 }).withMessage('Localidad max 150 chars'),
@@ -349,38 +349,38 @@ module.exports = {
       .isInt({ min: 1 })
       .withMessage('Categoría must be a valid ID'),
     body('descripcion')
-      .optional()
+      .optional({ checkFalsy: true })
       .trim()
-      .isLength({ min: 10, max: 1000 })
-      .withMessage('Descripción must be between 10 and 1000 characters'),
+      .isLength({ max: 1000 })
+      .withMessage('Descripción cannot exceed 1000 characters'),
     body('telefono')
-      .optional()
+      .optional({ checkFalsy: true })
       .matches(/^[+]?[\d\s\-\(\)]+$/)
       .withMessage('Please provide a valid phone number'),
     body('whatsapp')
-      .optional()
+      .optional({ checkFalsy: true })
       .matches(/^[+]?[\d\s\-\(\)]+$/)
       .withMessage('Please provide a valid WhatsApp number'),
     body('latitud')
-      .optional()
+      .optional({ checkFalsy: true })
       .isFloat({ min: -90, max: 90 })
       .withMessage('Latitud must be between -90 and 90'),
     body('longitud')
-      .optional()
+      .optional({ checkFalsy: true })
       .isFloat({ min: -180, max: 180 })
       .withMessage('Longitud must be between -180 and 180'),
     body('horario')
-      .optional()
+      .optional({ checkFalsy: true })
       .trim()
       .isLength({ max: 200 })
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['APROBADO', 'BORRADOR', 'PENDIENTE', 'RECHAZADO'])
-      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO'),
-    body('departamento').optional().trim().isLength({ max: 100 }).withMessage('Departamento max 100 chars'),
-    body('municipio').optional().trim().isLength({ max: 100 }).withMessage('Municipio max 100 chars'),
-    body('localidad').optional().trim().isLength({ max: 150 }).withMessage('Localidad max 150 chars'),
-    body('direccion').optional().trim().isLength({ max: 300 }).withMessage('Dirección max 300 chars'),
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado'])
+      .withMessage('Estado inválido'),
+    body('departamento').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('municipio').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('localidad').optional({ checkFalsy: true }).trim().isLength({ max: 150 }),
+    body('direccion').optional({ checkFalsy: true }).trim().isLength({ max: 300 }),
   ]
 };

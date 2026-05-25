@@ -1,15 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import { useToastStore } from '../stores/toast'
 import Navbar from '../components/layout/Navbar.vue'
 import { getAllBusinesses, getPendingBusinesses, updateBusinessStatus, getAllUsers, updateUserRole } from '../services/businessService'
 
 // Import Modals
 import EditBusinessModal from '../components/admin/EditBusinessModal.vue'
 import EditUserModal from '../components/admin/EditUserModal.vue'
-
-const authStore = useAuthStore()
 
 // Local Toast System
 const toasts = ref([])
@@ -26,6 +22,18 @@ const pendingRequests = ref([])
 const allBusinesses = ref([])
 const allUsers = ref([])
 const loading = ref(false)
+const businessFilter = ref('todos')
+
+const isActive = (b) => b.status === 'activo' || b.status === 'aprobado'
+
+const filteredBusinesses = computed(() => {
+  if (businessFilter.value === 'activos') return allBusinesses.value.filter(isActive)
+  if (businessFilter.value === 'inactivos') return allBusinesses.value.filter(b => !isActive(b))
+  return allBusinesses.value
+})
+
+const countActivos   = computed(() => allBusinesses.value.filter(isActive).length)
+const countInactivos = computed(() => allBusinesses.value.filter(b => !isActive(b)).length)
 
 // Modals State
 const showBusinessModal = ref(false)
@@ -38,7 +46,7 @@ const updatingBusinessId = ref(null) // for toggle switch spinner
 // Computed variable to check for authentication token
 const hasToken = computed(() => !!localStorage.getItem('token'))
 
-const fetchData = async (force = false) => {
+const fetchData = async () => {
   if (loading.value) return; // Prevent concurrent fetches
   
   loading.value = true
@@ -46,7 +54,7 @@ const fetchData = async (force = false) => {
     if (activeTab.value === 'requests') {
       pendingRequests.value = await getPendingBusinesses()
     } else if (activeTab.value === 'businesses') {
-      allBusinesses.value = await getAllBusinesses()
+      allBusinesses.value = await getAllBusinesses({ estado: 'ALL' })
     } else if (activeTab.value === 'users') {
       allUsers.value = await getAllUsers()
     }
@@ -183,7 +191,7 @@ onMounted(fetchData)
             <button @click="switchTab('businesses')" :class="[activeTab === 'businesses' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Negocios</button>
             <button @click="switchTab('users')" :class="[activeTab === 'users' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Usuarios</button>
           </div>
-          <button @click="fetchData(true)" :disabled="loading" title="Recargar datos de la pestaña actual" class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 text-fiery-navy hover:bg-slate-50 transition-colors shrink-0 disabled:opacity-50">
+          <button @click="fetchData()" :disabled="loading" title="Recargar datos de la pestaña actual" class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 text-fiery-navy hover:bg-slate-50 transition-colors shrink-0 disabled:opacity-50">
             <svg :class="['w-5 h-5', loading ? 'animate-spin' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
           </button>
         </div>
@@ -221,7 +229,24 @@ onMounted(fetchData)
         </div>
 
         <!-- Businesses Tab -->
-        <div v-else-if="activeTab === 'businesses'" class="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+        <div v-if="activeTab === 'businesses'" class="space-y-4">
+          <!-- Filtros -->
+          <div class="flex items-center gap-2">
+            <button
+              @click="businessFilter = 'todos'"
+              :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'todos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
+            >Todos <span class="opacity-60">({{ allBusinesses.length }})</span></button>
+            <button
+              @click="businessFilter = 'activos'"
+              :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'activos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
+            >Activos <span class="opacity-60">({{ countActivos }})</span></button>
+            <button
+              @click="businessFilter = 'inactivos'"
+              :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'inactivos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
+            >Inactivos <span class="opacity-60">({{ countInactivos }})</span></button>
+          </div>
+
+          <div class="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <div class="overflow-x-auto w-full">
             <table class="w-full text-left border-collapse" style="min-width: 580px">
               <thead>
@@ -233,7 +258,7 @@ onMounted(fetchData)
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-50">
-                <tr v-for="business in allBusinesses" :key="business.id" class="hover:bg-slate-50 transition-colors">
+                <tr v-for="business in filteredBusinesses" :key="business.id" class="hover:bg-slate-50 transition-colors">
                   <td class="px-6 md:px-8 py-5">
                     <div class="flex items-center gap-4">
                       <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 shrink-0">
@@ -279,6 +304,7 @@ onMounted(fetchData)
                 </tr>
               </tbody>
             </table>
+          </div>
           </div>
         </div>
 

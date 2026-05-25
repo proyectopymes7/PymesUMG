@@ -169,6 +169,8 @@ router.delete('/producto/:id_imagen', auth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+
 });
+
 
 module.exports = router;

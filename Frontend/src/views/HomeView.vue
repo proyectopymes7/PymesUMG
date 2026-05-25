@@ -244,7 +244,7 @@ onUnmounted(() => {
           :class="revealedElements.has('reveal-0') ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'"
         >
           <div class="text-center md:text-left mb-8 md:mb-0">
-            <h4 class="eyebrow-red font-black uppercase tracking-[0.3em] text-xs mb-3">Recomendados</h4>
+            <h4 class="eyebrow-blue font-black uppercase tracking-[0.3em] text-xs mb-3">Recomendados</h4>
             <h2 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit uppercase tracking-tighter leading-none">Negocios <span class="text-fiery-red">Destacados</span></h2>
           </div>
           <div class="flex gap-4">

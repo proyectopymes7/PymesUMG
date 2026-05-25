@@ -2,17 +2,25 @@ import api from './api';
 
 // Helper function to map backend models to frontend format
 const mapBusinessData = (b) => {
+  const cats = b.categorias_nombres
+    ? b.categorias_nombres.split(', ').filter(Boolean)
+    : (b.categoria_nombre ? [b.categoria_nombre] : [])
+  const catIds = b.categorias_ids
+    ? b.categorias_ids.split(',').map(Number).filter(Boolean)
+    : (b.id_categoria ? [Number(b.id_categoria)] : [])
   return {
     id: b.id_emprendimiento,
     name: b.nombre,
-    category: b.categoria_nombre || 'General',
+    category: cats[0] || 'General',
+    categorias: cats,
+    categorias_ids: catIds,
     rating: b.rating_promedio ? Number(b.rating_promedio).toFixed(1) : 4.5,
     reviewCount: b.vistas || 0,
     description: b.descripcion,
     dept: b.departamento || '',
     muni: b.municipio || '',
     localidad: b.localidad || '',
-    location: b.direccion || '',
+    location: (b.municipio && b.departamento) ? `${b.municipio}, ${b.departamento}` : (b.direccion || ''),
     departamento: b.departamento || '',
     municipio: b.municipio || '',
     lat: b.latitud ? Number(b.latitud) : null,
@@ -20,8 +28,10 @@ const mapBusinessData = (b) => {
     image: b.logo_url || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80',
     logo: b.logo_url || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=400&auto=format&fit=crop',
     estado: b.estado ? b.estado.toLowerCase() : 'activo',
+    status: b.estado ? b.estado.toLowerCase() : 'activo',
     destacado: b.destacado === 1 || b.destacado === true,
     id_usuario: b.id_usuario,
+    horario: b.horario || '',
     hours: [{ day: 'Lunes - Domingo', time: b.horario || '8:00 AM - 5:00 PM' }],
     socials: {
       whatsapp: b.whatsapp ? `https://wa.me/${b.whatsapp}` : '',
@@ -37,7 +47,7 @@ const mapBusinessData = (b) => {
 
 export const getAllBusinesses = async (params = {}) => {
   try {
-    const response = await api.get('/emprendimientos', { params });
+    const response = await api.get('/emprendimientos', { params: { limit: 200, ...params } });
     if (response.data.success && response.data.data) {
       return response.data.data.map(mapBusinessData);
     }
@@ -76,7 +86,7 @@ export const getBusinessById = async (id) => {
 
 export const getPendingBusinesses = async () => {
   try {
-    const response = await api.get('/emprendimientos', { params: { estado: 'PENDIENTE' } });
+    const response = await api.get('/emprendimientos', { params: { estado: 'pendiente' } });
     if (response.data.success && response.data.data) {
       return response.data.data.map(mapBusinessData);
     }
@@ -97,6 +107,19 @@ export const getCategories = async () => {
   } catch (error) {
     console.error('Error fetching categories:', error);
     return ['Todas', 'Restaurantes', 'Salud', 'Servicios', 'Tecnología', 'Belleza', 'Comercio'];
+  }
+};
+
+export const getRawCategories = async () => {
+  try {
+    const response = await api.get('/categories');
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error fetching raw categories:', error);
+    return [];
   }
 };
 
@@ -197,6 +220,19 @@ export const updateUserRole = async (userId, newRoleId) => {
   }
 };
 
+export const getBusinessProducts = async (businessId) => {
+  try {
+    const response = await api.get(`/productos/emprendimiento/${businessId}`)
+    if (response.data.success && response.data.data) {
+      return response.data.data
+    }
+    return []
+  } catch (error) {
+    console.error(`Error fetching products for business ${businessId}:`, error)
+    return []
+  }
+}
+
 export const getBusinessReviews = async (businessId) => {
   try {
     const response = await api.get(`/valoraciones/emprendimiento/${businessId}`);
@@ -237,6 +273,7 @@ export default {
   deleteBusinessImage,
   getAllUsers,
   updateUserRole,
+  getBusinessProducts,
   getBusinessReviews,
   createReview
 };
