@@ -1,6 +1,10 @@
 const { body, validationResult } = require('express-validator');
 const Emprendimiento = require('../models/Emprendimiento');
+const User = require('../models/User');
 const logger = require('../utils/logger');
+
+const isAdmin = (user) => user && (user.id_rol === 1 || user.id_rol === 2);
+const isOwner = (user, emp) => user && user.id_usuario === emp.id_usuario;
 
 const createEmprendimiento = async (req, res) => {
   try {
@@ -43,19 +47,14 @@ const getEmprendimientos = async (req, res) => {
   try {
     const filters = {
       id_categoria: req.query.id_categoria,
-      estado: req.query.estado || 'APROBADO',
+      estado: req.query.estado === 'ALL' ? undefined : (req.query.estado || 'activo'),
       destacado: req.query.destacado === 'true' ? 1 : req.query.destacado === 'false' ? 0 : undefined,
       limit: parseInt(req.query.limit) || 50,
       offset: parseInt(req.query.offset) || 0
     };
 
-    // If user is not admin, only show their own emprendimientos
-    if (req.user && req.user.rol_nombre !== 'admin') {
-      filters.id_usuario = req.user.id_usuario;
-    }
-
     const emprendimientos = await Emprendimiento.findAll(filters);
-    const total = await Emprendimiento.count({ 
+    const total = await Emprendimiento.count({
       id_categoria: filters.id_categoria,
       estado: filters.estado
     });
@@ -91,10 +90,7 @@ const getEmprendimientoById = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (req.user && req.user.rol_nombre !== 'admin' && 
-        emprendimiento.id_usuario !== req.user.id_usuario && 
-        emprendimiento.estado !== 'activo') {
+    if (emprendimiento.estado !== 'APROBADO' && !isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You do not have permission to view this emprendimiento'
@@ -139,8 +135,7 @@ const updateEmprendimiento = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (req.user.rol_nombre !== 'admin' && emprendimiento.id_usuario !== req.user.id_usuario) {
+    if (!isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You can only update your own emprendimientos'
@@ -148,6 +143,16 @@ const updateEmprendimiento = async (req, res) => {
     }
 
     const updateData = req.body;
+
+    // Auto-promote Visitante (4) → Emprendedor (3) when business is approved
+    if (updateData.estado === 'APROBADO') {
+      const owner = await User.findById(emprendimiento.id_usuario);
+      if (owner && owner.id_rol === 4) {
+        await User.updateRole(emprendimiento.id_usuario, 3);
+        logger.info(`User promoted to Emprendedor: ${owner.correo}`);
+      }
+    }
+
     const updatedEmprendimiento = await Emprendimiento.update(id, updateData);
 
     logger.info(`Emprendimiento updated: ${emprendimiento.nombre}`, { 
@@ -164,7 +169,7 @@ const updateEmprendimiento = async (req, res) => {
     logger.error('Update emprendimiento error:', error);
     res.status(500).json({
       error: 'Failed to update emprendimiento',
-      message: 'Internal server error'
+      message: error.message || 'Internal server error'
     });
   }
 };
@@ -181,8 +186,7 @@ const deleteEmprendimiento = async (req, res) => {
       });
     }
 
-    // Check permissions
-    if (req.user.rol_nombre !== 'admin' && emprendimiento.id_usuario !== req.user.id_usuario) {
+    if (!isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You can only delete your own emprendimientos'
@@ -327,8 +331,12 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['APROBADO', 'BORRADOR', 'PENDIENTE', 'RECHAZADO'])
-      .withMessage('Estado must be APROBADO, BORRADOR, PENDIENTE, or RECHAZADO')
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado'])
+      .withMessage('Estado inválido'),
+    body('departamento').optional().trim().isLength({ max: 100 }).withMessage('Departamento max 100 chars'),
+    body('municipio').optional().trim().isLength({ max: 100 }).withMessage('Municipio max 100 chars'),
+    body('localidad').optional().trim().isLength({ max: 150 }).withMessage('Localidad max 150 chars'),
+    body('direccion').optional().trim().isLength({ max: 300 }).withMessage('Dirección max 300 chars'),
   ],
   validateUpdateEmprendimiento: [
     body('nombre')
@@ -341,34 +349,38 @@ module.exports = {
       .isInt({ min: 1 })
       .withMessage('Categoría must be a valid ID'),
     body('descripcion')
-      .optional()
+      .optional({ checkFalsy: true })
       .trim()
-      .isLength({ min: 10, max: 1000 })
-      .withMessage('Descripción must be between 10 and 1000 characters'),
+      .isLength({ max: 1000 })
+      .withMessage('Descripción cannot exceed 1000 characters'),
     body('telefono')
-      .optional()
+      .optional({ checkFalsy: true })
       .matches(/^[+]?[\d\s\-\(\)]+$/)
       .withMessage('Please provide a valid phone number'),
     body('whatsapp')
-      .optional()
+      .optional({ checkFalsy: true })
       .matches(/^[+]?[\d\s\-\(\)]+$/)
       .withMessage('Please provide a valid WhatsApp number'),
     body('latitud')
-      .optional()
+      .optional({ checkFalsy: true })
       .isFloat({ min: -90, max: 90 })
       .withMessage('Latitud must be between -90 and 90'),
     body('longitud')
-      .optional()
+      .optional({ checkFalsy: true })
       .isFloat({ min: -180, max: 180 })
       .withMessage('Longitud must be between -180 and 180'),
     body('horario')
-      .optional()
+      .optional({ checkFalsy: true })
       .trim()
       .isLength({ max: 200 })
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['activo', 'inactivo', 'pendiente'])
-      .withMessage('Estado must be activo, inactivo, or pendiente')
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado'])
+      .withMessage('Estado inválido'),
+    body('departamento').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('municipio').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
+    body('localidad').optional({ checkFalsy: true }).trim().isLength({ max: 150 }),
+    body('direccion').optional({ checkFalsy: true }).trim().isLength({ max: 300 }),
   ]
 };

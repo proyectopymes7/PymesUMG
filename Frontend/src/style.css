@@ -19,3 +19,24 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Ensure Google Maps autocomplete dropdown appears above all modals */
+.pac-container {
+  z-index: 9999 !important;
+}
+
+/* Force PlaceAutocompleteElement to always use light mode */
+gmp-place-autocomplete {
+  width: 100%;
+  display: block;
+  color-scheme: light;
+  --gmp-color-surface: #ffffff;
+  --gmp-color-on-surface: #003049;
+  --gmp-color-on-surface-variant: #64748b;
+  --gmp-color-outline: #e2e8f0;
+  --gmp-color-outline-variant: #e2e8f0;
+  --gmp-color-primary: #C1121F;
+  font-family: 'Outfit', sans-serif;
+  border-radius: 12px;
+  background: #ffffff;
+}

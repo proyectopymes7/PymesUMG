@@ -135,22 +135,23 @@ router.get('/:id', optionalAuth, async (req, res) => {
 // Protected routes
 router.post('/', auth, async (req, res) => {
   try {
-    const { id_emprendimiento, nombre, precio, disponible, tipo, visibilidad_precio } = req.body;
-    
-    if (!id_emprendimiento || !nombre || precio === undefined) {
+    const { id_emprendimiento, nombre, precio, disponible, tipo, visibilidad_precio, descripcion } = req.body;
+
+    if (!id_emprendimiento || !nombre) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'id_emprendimiento, nombre, and precio are required'
+        message: 'id_emprendimiento y nombre son requeridos'
       });
     }
 
     const newProducto = await ProductoServicio.create({
       id_emprendimiento,
       nombre,
-      precio,
+      descripcion: descripcion || null,
+      precio: precio !== undefined ? precio : null,
       disponible: disponible !== undefined ? disponible : 1,
       tipo: tipo || 'producto',
-      visibilidad_precio: visibilidad_precio || 'publico'
+      visibilidad_precio: visibilidad_precio || 'VISIBLE'
     });
     
     res.status(201).json({
@@ -198,21 +199,17 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
-// Soft delete will be implemented later
-// router.delete('/:id', auth, async (req, res) => {
-//   try {
-//     await ProductoServicio.delete(req.params.id);
-//     
-//     res.json({
-//       success: true,
-//       message: 'Producto deleted successfully'
-//     });
-//   } catch (error) {
-//     res.status(500).json({
-//       error: 'Failed to delete producto',
-//       message: 'Internal server error'
-//     });
-//   }
-// });
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const producto = await ProductoServicio.findById(req.params.id);
+    if (!producto) {
+      return res.status(404).json({ error: 'Producto not found' });
+    }
+    await ProductoServicio.delete(req.params.id);
+    res.json({ success: true, message: 'Producto deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete producto', message: 'Internal server error' });
+  }
+});
 
 module.exports = router;

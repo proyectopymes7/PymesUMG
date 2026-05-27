@@ -4,21 +4,22 @@ class ProductoServicio {
   static async create(productoData) {
     const query = `
       INSERT INTO ProductosServicios (
-        id_emprendimiento, nombre, precio, disponible, tipo, visibilidad_precio
+        id_emprendimiento, nombre, descripcion, precio, disponible, tipo, visibilidad_precio
       )
       VALUES (
-        @id_emprendimiento, @nombre, @precio, @disponible, @tipo, @visibilidad_precio
+        @id_emprendimiento, @nombre, @descripcion, @precio, @disponible, @tipo, @visibilidad_precio
       );
       SELECT SCOPE_IDENTITY() as id_producto;
     `;
-    
+
     const params = [
       { name: 'id_emprendimiento', value: productoData.id_emprendimiento, type: sql.Int },
-      { name: 'nombre', value: productoData.nombre, type: sql.VarChar },
-      { name: 'precio', value: productoData.precio, type: sql.Decimal },
-      { name: 'disponible', value: productoData.disponible !== undefined ? productoData.disponible : 1, type: sql.Bit },
-      { name: 'tipo', value: productoData.tipo || 'producto', type: sql.VarChar },
-      { name: 'visibilidad_precio', value: productoData.visibilidad_precio || 'publico', type: sql.VarChar }
+      { name: 'nombre',            value: productoData.nombre, type: sql.VarChar },
+      { name: 'descripcion',       value: productoData.descripcion || null, type: sql.NVarChar },
+      { name: 'precio',            value: productoData.precio !== undefined ? productoData.precio : null, type: sql.Decimal },
+      { name: 'disponible',        value: productoData.disponible !== undefined ? productoData.disponible : 1, type: sql.Bit },
+      { name: 'tipo',              value: productoData.tipo || 'producto', type: sql.VarChar },
+      { name: 'visibilidad_precio',value: productoData.visibilidad_precio || 'VISIBLE', type: sql.VarChar }
     ];
 
     try {
@@ -51,7 +52,8 @@ class ProductoServicio {
 
   static async findByEmprendimiento(id_emprendimiento, filters = {}) {
     let query = `
-      SELECT ps.*, 
+      SELECT ps.*,
+             (SELECT TOP 1 url FROM ImagenesProducto WHERE id_producto = ps.id_producto ORDER BY id_imagen ASC) as imagen_url,
              (SELECT COUNT(*) FROM ImagenesProducto WHERE id_producto = ps.id_producto) as total_imagenes
       FROM ProductosServicios ps
       WHERE ps.id_emprendimiento = @id_emprendimiento
@@ -212,6 +214,16 @@ class ProductoServicio {
     try {
       await executeQuery(query, params);
       return await this.findById(id);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async delete(id) {
+    const query = `DELETE FROM ProductosServicios WHERE id_producto = @id_producto`;
+    const params = [{ name: 'id_producto', value: id, type: sql.Int }];
+    try {
+      await executeQuery(query, params);
     } catch (error) {
       throw error;
     }

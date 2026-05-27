@@ -5,11 +5,13 @@ class Emprendimiento {
     const query = `
       INSERT INTO Emprendimientos (
         id_usuario, id_categoria, nombre, descripcion, telefono, whatsapp,
-        latitud, longitud, horario, vistas, destacado, estado, fecha_registro
+        latitud, longitud, horario, vistas, destacado, estado,
+        departamento, municipio, localidad, direccion, fecha_registro
       )
       VALUES (
         @id_usuario, @id_categoria, @nombre, @descripcion, @telefono, @whatsapp,
-        @latitud, @longitud, @horario, @vistas, @destacado, @estado, GETDATE()
+        @latitud, @longitud, @horario, @vistas, @destacado, @estado,
+        @departamento, @municipio, @localidad, @direccion, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as id_emprendimiento;
     `;
@@ -24,9 +26,13 @@ class Emprendimiento {
       { name: 'latitud', value: emprendimientoData.latitud, type: sql.Decimal },
       { name: 'longitud', value: emprendimientoData.longitud, type: sql.Decimal },
       { name: 'horario', value: emprendimientoData.horario, type: sql.VarChar },
-      { name: 'vistas', value: emprendimientoData.vistas || 0, type: sql.Int },
-      { name: 'destacado', value: emprendimientoData.destacado || 0, type: sql.Bit },
-      { name: 'estado', value: emprendimientoData.estado || 'activo', type: sql.VarChar }
+      { name: 'vistas',       value: emprendimientoData.vistas || 0,                    type: sql.Int },
+      { name: 'destacado',    value: emprendimientoData.destacado || 0,                 type: sql.Bit },
+      { name: 'estado',       value: emprendimientoData.estado || 'pendiente',          type: sql.VarChar },
+      { name: 'departamento', value: emprendimientoData.departamento || null,           type: sql.NVarChar },
+      { name: 'municipio',    value: emprendimientoData.municipio || null,              type: sql.NVarChar },
+      { name: 'localidad',    value: emprendimientoData.localidad || null,              type: sql.NVarChar },
+      { name: 'direccion',    value: emprendimientoData.direccion || null,              type: sql.NVarChar },
     ];
 
     try {
@@ -39,9 +45,15 @@ class Emprendimiento {
 
   static async findById(id) {
     const query = `
-      SELECT e.*, 
+      SELECT e.*,
              u.nombre as usuario_nombre, u.apellido as usuario_apellido,
              c.nombre as categoria_nombre,
+             (SELECT STRING_AGG(c2.nombre, ', ')
+              FROM EmprendimientoCategorias ec JOIN Categorias c2 ON ec.id_categoria = c2.id_categoria
+              WHERE ec.id_emprendimiento = e.id_emprendimiento) as categorias_nombres,
+             (SELECT STRING_AGG(CAST(ec.id_categoria AS VARCHAR(10)), ',')
+              FROM EmprendimientoCategorias ec
+              WHERE ec.id_emprendimiento = e.id_emprendimiento) as categorias_ids,
              (SELECT COUNT(*) FROM ProductosServicios WHERE id_emprendimiento = @id_emprendimiento) as total_productos,
              (SELECT COUNT(*) FROM ImagenesEmprendimiento WHERE id_emprendimiento = @id_emprendimiento) as total_imagenes,
              (SELECT AVG(puntuacion) FROM Calificaciones WHERE id_emprendimiento = @id_emprendimiento) as rating_promedio
@@ -63,9 +75,15 @@ class Emprendimiento {
 
   static async findAll(filters = {}) {
     let query = `
-      SELECT e.*, 
+      SELECT e.*,
              u.nombre as usuario_nombre, u.apellido as usuario_apellido,
              c.nombre as categoria_nombre,
+             (SELECT STRING_AGG(c2.nombre, ', ')
+              FROM EmprendimientoCategorias ec JOIN Categorias c2 ON ec.id_categoria = c2.id_categoria
+              WHERE ec.id_emprendimiento = e.id_emprendimiento) as categorias_nombres,
+             (SELECT STRING_AGG(CAST(ec.id_categoria AS VARCHAR(10)), ',')
+              FROM EmprendimientoCategorias ec
+              WHERE ec.id_emprendimiento = e.id_emprendimiento) as categorias_ids,
              (SELECT COUNT(*) FROM ProductosServicios WHERE id_emprendimiento = e.id_emprendimiento) as total_productos,
              (SELECT COUNT(*) FROM ImagenesEmprendimiento WHERE id_emprendimiento = e.id_emprendimiento) as total_imagenes,
              (SELECT AVG(puntuacion) FROM Calificaciones WHERE id_emprendimiento = e.id_emprendimiento) as rating_promedio
@@ -85,9 +103,17 @@ class Emprendimiento {
     }
 
     if (filters.estado) {
-      query += ` AND e.estado = @param${paramIndex}`;
-      params.push({ name: `param${paramIndex}`, value: filters.estado, type: sql.VarChar });
-      paramIndex++;
+      if (Array.isArray(filters.estado)) {
+        const placeholders = filters.estado.map((_, i) => `@est${i}`).join(', ');
+        query += ` AND e.estado IN (${placeholders})`;
+        filters.estado.forEach((s, i) => {
+          params.push({ name: `est${i}`, value: s, type: sql.VarChar });
+        });
+      } else {
+        query += ` AND e.estado = @param${paramIndex}`;
+        params.push({ name: `param${paramIndex}`, value: filters.estado, type: sql.VarChar });
+        paramIndex++;
+      }
     }
 
     if (filters.destacado !== undefined) {
@@ -164,28 +190,72 @@ class Emprendimiento {
   }
 
   static async update(id, emprendimientoData) {
+    const ALLOWED = new Set([
+      'id_categoria', 'nombre', 'descripcion', 'telefono', 'whatsapp',
+      'latitud', 'longitud', 'horario', 'vistas', 'destacado', 'estado',
+      'departamento', 'municipio', 'localidad', 'direccion', 'logo_url'
+    ]);
+    const TYPE_MAP = {
+      id_categoria: sql.Int,
+      vistas:       sql.Int,
+      destacado:    sql.Bit,
+      latitud:      sql.Float,
+      longitud:     sql.Float,
+    };
+    const { categorias, ...rest } = emprendimientoData;
     const setClause = [];
     const params = [{ name: 'id_emprendimiento', value: id, type: sql.Int }];
+    let paramIdx = 0;
 
-    Object.keys(emprendimientoData).forEach((key, index) => {
-      if (emprendimientoData[key] !== undefined) {
-        setClause.push(`${key} = @param${index}`);
-        params.push({ name: `param${index}`, value: emprendimientoData[key], type: sql.NVarChar });
+    Object.keys(rest).forEach((key) => {
+      if (rest[key] !== undefined && ALLOWED.has(key)) {
+        setClause.push(`${key} = @upd${paramIdx}`);
+        params.push({ name: `upd${paramIdx}`, value: rest[key], type: TYPE_MAP[key] || sql.NVarChar });
+        paramIdx++;
       }
     });
 
-    if (setClause.length === 0) {
-      throw new Error('No fields to update');
-    }
-
-    const query = `
-      UPDATE Emprendimientos 
-      SET ${setClause.join(', ')}
-      WHERE id_emprendimiento = @id_emprendimiento;
+    // Ensure junction table exists (idempotent)
+    const createTableQuery = `
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmprendimientoCategorias')
+      CREATE TABLE EmprendimientoCategorias (
+        id_emprendimiento INT NOT NULL REFERENCES Emprendimientos(id_emprendimiento) ON DELETE CASCADE,
+        id_categoria      INT NOT NULL REFERENCES Categorias(id_categoria) ON DELETE CASCADE,
+        PRIMARY KEY (id_emprendimiento, id_categoria)
+      );
     `;
 
     try {
-      await executeQuery(query, params);
+      await executeQuery(createTableQuery, []);
+    } catch (_) { /* ignore if already exists or FK issues */ }
+
+    try {
+      if (setClause.length > 0) {
+        const query = `UPDATE Emprendimientos SET ${setClause.join(', ')} WHERE id_emprendimiento = @id_emprendimiento;`;
+        await executeQuery(query, params);
+      }
+
+      if (Array.isArray(categorias) && categorias.length > 0) {
+        try {
+          await executeQuery(
+            'DELETE FROM EmprendimientoCategorias WHERE id_emprendimiento = @id',
+            [{ name: 'id', value: id, type: sql.Int }]
+          );
+          for (const catId of categorias.slice(0, 3)) {
+            await executeQuery(
+              'INSERT INTO EmprendimientoCategorias (id_emprendimiento, id_categoria) VALUES (@id_emp, @id_cat)',
+              [
+                { name: 'id_emp', value: id,            type: sql.Int },
+                { name: 'id_cat', value: Number(catId), type: sql.Int }
+              ]
+            );
+          }
+        } catch (catError) {
+          // Categories update failed but main data was saved — log and continue
+          console.error('Warning: categories update failed:', catError.message);
+        }
+      }
+
       return await this.findById(id);
     } catch (error) {
       throw error;
@@ -220,11 +290,19 @@ class Emprendimiento {
     }
 
     if (filters.estado) {
-      query += ` AND estado = @param${paramIndex}`;
-      params.push({ name: `param${paramIndex}`, value: filters.estado, type: sql.VarChar });
-      paramIndex++;
+      if (Array.isArray(filters.estado)) {
+        const placeholders = filters.estado.map((_, i) => `@est${i}`).join(', ');
+        query += ` AND estado IN (${placeholders})`;
+        filters.estado.forEach((s, i) => {
+          params.push({ name: `est${i}`, value: s, type: sql.VarChar });
+        });
+      } else {
+        query += ` AND estado = @param${paramIndex}`;
+        params.push({ name: `param${paramIndex}`, value: filters.estado, type: sql.VarChar });
+        paramIndex++;
+      }
     }
-    
+
     try {
       const result = await executeQuery(query, params);
       return result[0].total;

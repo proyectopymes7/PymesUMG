@@ -1,9 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
-const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const logger = require('../utils/logger');
 
 const generateToken = (userId) => {
@@ -24,7 +22,7 @@ const register = async (req, res) => {
       });
     }
 
-    const { nombre, apellido, correo, password, id_rol = 2 } = req.body; // Default to regular user role
+    const { nombre, apellido, correo, password, id_rol = 4 } = req.body; // Default: Visitante
 
     // Check if user already exists
     const existingUser = await User.findByEmail(correo);
@@ -173,20 +171,21 @@ const login = async (req, res) => {
 
 const googleLogin = async (req, res) => {
   try {
-    const { idToken } = req.body;
+    const { access_token } = req.body;
 
-    if (!idToken) {
-      return res.status(400).json({ error: 'idToken is required' });
+    if (!access_token) {
+      return res.status(400).json({ error: 'access_token is required' });
     }
 
-    // Verify Google Token
-    const ticket = await client.verifyIdToken({
-      idToken: idToken,
-      audience: process.env.GOOGLE_CLIENT_ID,
+    const googleRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` }
     });
 
-    const payload = ticket.getPayload();
-    const { email, given_name, family_name, picture } = payload;
+    if (!googleRes.ok) {
+      return res.status(401).json({ error: 'Invalid Google access token' });
+    }
+
+    const { email, given_name, family_name } = await googleRes.json();
 
     // Check if user exists
     let user = await User.findByEmail(email);
@@ -197,8 +196,8 @@ const googleLogin = async (req, res) => {
         nombre: given_name || 'Usuario',
         apellido: family_name || 'Google',
         correo: email,
-        password_hash: 'GOOGLE_AUTH_ACCOUNT', // Placeholder since it's Google Auth
-        id_rol: 2, // Default role
+        password_hash: 'GOOGLE_AUTH_ACCOUNT',
+        id_rol: 4, // Default: Visitante
         activo: 1
       };
       

@@ -63,7 +63,7 @@ class User {
 
   static async findAll(limit = 50, offset = 0) {
     const query = `
-      SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.activo, 
+      SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.activo, u.id_rol,
              u.fecha_registro, u.intentos_fallidos, u.bloqueado_hasta,
              r.nombre as rol_nombre
       FROM Usuarios u
@@ -108,6 +108,19 @@ class User {
     try {
       await executeQuery(query, params);
       return await this.findById(id);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async updateRole(id, roleId) {
+    const query = `UPDATE Usuarios SET id_rol = @id_rol WHERE id_usuario = @id_usuario;`;
+    const params = [
+      { name: 'id_rol', value: roleId, type: sql.Int },
+      { name: 'id_usuario', value: id, type: sql.Int }
+    ];
+    try {
+      await executeQuery(query, params);
     } catch (error) {
       throw error;
     }

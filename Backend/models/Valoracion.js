@@ -71,11 +71,10 @@ class Valoracion {
 
     if (filters.limit) {
       query += ` OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
-      const offset = filters.offset || 0;
-      params.push({ value: offset, type: sql.Int });
-      params.push({ value: filters.limit, type: sql.Int });
+      params.push({ name: 'offset', value: filters.offset || 0, type: sql.Int });
+      params.push({ name: 'limit',  value: filters.limit,       type: sql.Int });
     }
-    
+
     try {
       return await executeQuery(query, params);
     } catch (error) {
@@ -113,11 +112,10 @@ class Valoracion {
 
     if (filters.limit) {
       query += ` OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
-      const offset = filters.offset || 0;
-      params.push({ value: offset, type: sql.Int });
-      params.push({ value: filters.limit, type: sql.Int });
+      params.push({ name: 'offset', value: filters.offset || 0, type: sql.Int });
+      params.push({ name: 'limit',  value: filters.limit,       type: sql.Int });
     }
-    
+
     try {
       return await executeQuery(query, params);
     } catch (error) {
