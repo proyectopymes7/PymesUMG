@@ -73,7 +73,17 @@ const authorize = (...roles) => {
       });
     }
 
-    if (!roles.includes(req.user.rol_nombre)) {
+    const normalizedRoles = roles.map(r => r.toLowerCase());
+    const userRole = req.user.rol_nombre?.toLowerCase();
+
+    const isAuthorized = normalizedRoles.some(role => {
+      if (role === 'admin') {
+        return userRole === 'administrador' || userRole === 'superadministrador' || userRole === 'admin';
+      }
+      return userRole === role;
+    });
+
+    if (!isAuthorized) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'Insufficient permissions'

@@ -2,6 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import umgLogo from '../../assets/UMG.png'
 
 const route = useRoute()
 const isMenuOpen = ref(false)
@@ -27,20 +28,6 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
-const handleGoogleLogin = async (response) => {
-  if (response.credential) {
-    try {
-      const success = await authStore.loginWithGoogle(response.credential)
-      if (success) {
-        alert('¡Login Exitoso!')
-      } else {
-        alert('Error en el servidor: ' + authStore.error)
-      }
-    } catch (e) {
-      alert('Error de conexión con el backend: ' + e.message)
-    }
-  }
-}
 
 const handleLogout = () => {
   authStore.logout()
@@ -61,11 +48,7 @@ const handleLogout = () => {
     <div class="max-w-7xl mx-auto flex items-center justify-between">
       <!-- Logo -->
       <RouterLink to="/" class="flex items-center gap-3 group">
-        <div class="w-10 h-10 md:w-12 md:h-12 bg-fiery-red rounded-xl flex items-center justify-center shadow-lg shadow-fiery-red/20 group-hover:rotate-12 transition-transform duration-500">
-          <svg class="w-6 h-6 md:w-7 md:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-          </svg>
-        </div>
+        <img :src="umgLogo" alt="UMG" class="w-10 h-10 md:w-12 md:h-12 object-contain" />
         <span class="font-black text-xl md:text-2xl tracking-tighter font-outfit uppercase">Aquí<span class="text-fiery-red">TENES</span></span>
       </RouterLink>
 
@@ -74,7 +57,7 @@ const handleLogout = () => {
         <RouterLink to="/" class="hover:text-fiery-red transition-colors relative group py-2">Inicio</RouterLink>
         <RouterLink to="/directorio" class="hover:text-fiery-red transition-colors relative group py-2">Directorio</RouterLink>
         <RouterLink to="/blog" class="hover:text-fiery-red transition-colors relative group py-2">Blog</RouterLink>
-        <RouterLink to="/admin" class="text-fiery-red hover:text-fiery-darkred transition-colors relative group py-2 flex items-center gap-2">
+        <RouterLink v-if="authStore.hasAdminPanel" to="/admin" class="text-fiery-red hover:text-fiery-darkred transition-colors relative group py-2 flex items-center gap-2">
           <span class="w-2 h-2 bg-fiery-red rounded-full animate-pulse"></span>
           Admin
         </RouterLink>
@@ -104,12 +87,10 @@ const handleLogout = () => {
 
         <!-- Desktop Login (Hidden on Mobile) -->
         <div v-else class="hidden sm:block">
-          <GoogleLogin :callback="handleGoogleLogin">
-            <button class="flex items-center gap-2 bg-fiery-red hover:bg-fiery-darkred text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-fiery-red/20 active:scale-95">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-              Ingresar
-            </button>
-          </GoogleLogin>
+          <RouterLink to="/login" class="flex items-center gap-2 bg-fiery-red hover:bg-fiery-darkred text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-fiery-red/20 active:scale-95">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            Ingresar
+          </RouterLink>
         </div>
         
         <!-- Hamburger Button (Visible only on Mobile) -->
@@ -127,7 +108,7 @@ const handleLogout = () => {
         <RouterLink @click="isMenuOpen = false" to="/" class="text-xl font-black">Inicio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/directorio" class="text-xl font-black">Directorio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/blog" class="text-xl font-black">Blog</RouterLink>
-        <RouterLink @click="isMenuOpen = false" to="/admin" class="text-xl font-black text-fiery-red">Panel Admin</RouterLink>
+        <RouterLink v-if="authStore.hasAdminPanel" @click="isMenuOpen = false" to="/admin" class="text-xl font-black text-fiery-red">Panel Admin</RouterLink>
         
         <div v-if="authStore.isAuthenticated" class="w-full flex flex-col items-center border-t pt-6">
           <p class="font-black mb-4">{{ authStore.userFullName }}</p>
@@ -135,14 +116,12 @@ const handleLogout = () => {
         </div>
         <!-- Mobile Login Button inside menu -->
         <div v-else class="w-full pt-4">
-          <GoogleLogin :callback="handleGoogleLogin">
-            <button class="w-full flex items-center justify-center gap-3 bg-fiery-red hover:bg-fiery-darkred text-white py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-fiery-red/30 active:scale-[0.98]">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-              </svg>
-              Ingresar
-            </button>
-          </GoogleLogin>
+          <RouterLink @click="isMenuOpen = false" to="/login" class="w-full flex items-center justify-center gap-3 bg-fiery-red hover:bg-fiery-darkred text-white py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-fiery-red/30 active:scale-[0.98]">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
+            Ingresar
+          </RouterLink>
         </div>
       </div>
     </transition>

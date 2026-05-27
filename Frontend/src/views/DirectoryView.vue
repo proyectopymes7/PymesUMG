@@ -13,29 +13,15 @@ const searchKeyword = ref('')
 const selectedDept = ref('Todas')
 const selectedMuni = ref('Todas')
 const searchBarrio = ref('')
-const selectedCategory = ref('Todas')
+const selectedCategories = ref([])
+const categoryDropdownOpen = ref(false)
 
-// Detectar si es PC para mantener filtros abiertos
 const isDesktop = ref(window.innerWidth >= 1024)
 const updateView = () => {
   isDesktop.value = window.innerWidth >= 1024
   if (isDesktop.value) isFilterOpen.value = true
 }
 
-onMounted(async () => {
-  window.addEventListener('resize', updateView)
-  updateView()
-  if (route.query.q) searchKeyword.value = route.query.q
-
-  try {
-    allBusinesses.value = await getAllBusinesses()
-    categories.value = await getCategories()
-  } catch (error) {
-    console.error('Error fetching directory data:', error)
-  }
-})
-
-// BASE DE DATOS COMPLETA
 const locationsData = {
   'Alta Verapaz': ['Chahal', 'Chisec', 'Cobán', 'Fray Bartolomé de las Casas', 'La Tinta', 'Lanquín', 'Panzós', 'Raxruhá', 'San Cristóbal Verapaz', 'San Juan Chamelco', 'San Pedro Carchá', 'Santa Cruz Verapaz', 'Santa María Cahabón', 'Senahú', 'Tamahú', 'Tactic', 'Tucurú'],
   'Baja Verapaz': ['Cubulco', 'Granados', 'Purulhá', 'Rabinal', 'Salamá', 'San Jerónimo', 'San Miguel Chicaj', 'Santa Cruz el Chol'],
@@ -55,7 +41,7 @@ const locationsData = {
   'Sacatepéquez': ['Alotenango', 'Ciudad Vieja', 'Jocotenango', 'Antigua Guatemala', 'Magdalena Milpas Altas', 'Pastores', 'San Antonio Aguas Calientes', 'San Bartolomé Milpas Altas', 'San Lucas Sacatepéquez', 'San Miguel Dueñas', 'Santa Catarina Barahona', 'Santa Lucía Milpas Altas', 'Santa María de Jesús', 'Santiago Sacatepéquez', 'Santo Domingo Xenacoj', 'Sumpango'],
   'San Marcos': ['Ayutla', 'Catarina', 'Comitancillo', 'Concepción Tutuapa', 'El Quetzal', 'El Tumbador', 'Esquipulas Palo Gordo', 'Ixchiguán', 'La Blanca', 'La Reforma', 'Malacatán', 'Nuevo Progreso', 'Ocós', 'Pajapita', 'Río Blanco', 'San Antonio Sacatepéquez', 'San Cristóbal Cucho', 'San José El Rodeo', 'San José Ojetenam', 'San Lorenzo', 'San Marcos', 'San Miguel Ixtahuacán', 'San Pablo', 'San Pedro Sacatepéquez', 'San Rafael Pie de la Cuesta', 'Sibinal', 'Sipacapa', 'Tacaná', 'Tajumulco', 'Tejutla'],
   'Santa Rosa': ['Barberena', 'Casillas', 'Chiquimulilla', 'Cuilapa', 'Guazacapán', 'Nueva Santa Rosa', 'Oratorio', 'Pueblo Nuevo Viñas', 'San Juan Tecuaco', 'San Rafael las Flores', 'Santa Cruz Naranjo', 'Santa María Ixhuatán', 'Santa Rosa de Lima', 'Taxisco'],
-  'Solola': ['Concepción', 'Nahualá', 'Panajachel', 'San Andrés Semetabaj', 'San Antonio Palopó', 'San José Chacayá', 'San Juan La Laguna', 'San Lucas Tolimán', 'San Marcos La Laguna', 'San Pablo La Laguna', 'San Pedro La Laguna', 'Santa Catarina Ixtahuacán', 'Santa Catarina Palopó', 'Santa Clara La Laguna', 'Santa Cruz La Laguna', 'Santa Lucía Utatlán', 'Santa María Visitación', 'Santiago Atitlán', 'Sololá'],
+  'Sololá': ['Concepción', 'Nahualá', 'Panajachel', 'San Andrés Semetabaj', 'San Antonio Palopó', 'San José Chacayá', 'San Juan La Laguna', 'San Lucas Tolimán', 'San Marcos La Laguna', 'San Pablo La Laguna', 'San Pedro La Laguna', 'Santa Catarina Ixtahuacán', 'Santa Catarina Palopó', 'Santa Clara La Laguna', 'Santa Cruz La Laguna', 'Santa Lucía Utatlán', 'Santa María Visitación', 'Santiago Atitlán', 'Sololá'],
   'Suchitepéquez': ['Chicacao', 'Cuyotenango', 'Mazatenango', 'Patulul', 'Pueblo Nuevo', 'Río Bravo', 'Samayac', 'San Antonio Suchitepéquez', 'San Bernardino', 'San Francisco Zapotitlán', 'San Gabriel', 'San José El Idolo', 'San José La Maquina', 'San Juan Bautista', 'San Lorenzo', 'San Miguel Panán', 'San Pablo Jocopilas', 'Santa Bárbara', 'Santo Domingo Suchitepéquez', 'Santo Tomás La Unión', 'Zunilito'],
   'Totonicapán': ['Momostenango', 'San Andrés Xecul', 'San Bartolo', 'San Cristóbal Totonicapán', 'San Francisco El Alto', 'Santa Lucía La Reforma', 'Santa María Chiquimula', 'Totonicapán'],
   'Zacapa': ['Cabañas', 'Estanzuela', 'Gualán', 'Huité', 'La Unión', 'Río Hondo', 'San Diego', 'San Jorge', 'Teculután', 'Usumatlán', 'Zacapa']
@@ -73,98 +59,237 @@ const municipalities = computed(() => {
 })
 
 const allBusinesses = ref([])
+const categories = ref([])
 
 const normalize = (str) => {
   if (!str) return ''
-  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '').toLowerCase()
+  return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '').toLowerCase()
+}
+
+const toggleCategory = (cat) => {
+  if (cat === 'Todas') { selectedCategories.value = []; return }
+  const idx = selectedCategories.value.indexOf(cat)
+  if (idx >= 0) {
+    selectedCategories.value.splice(idx, 1)
+  } else {
+    selectedCategories.value.push(cat)
+  }
 }
 
 const filteredBusinesses = computed(() => {
   const keyword = normalize(searchKeyword.value)
   const barrioQuery = normalize(searchBarrio.value)
   return allBusinesses.value.filter(b => {
-    const matchDept = selectedDept.value === 'Todas' || b.dept === selectedDept.value
-    const matchMuni = selectedMuni.value === 'Todas' || b.muni === selectedMuni.value
-    const matchBarrio = !barrioQuery || normalize(b.barrio).includes(barrioQuery)
-    const matchCategory = selectedCategory.value === 'Todas' || b.category === selectedCategory.value
-    const matchKeyword = normalize(b.name).includes(keyword) || normalize(b.category).includes(keyword) || normalize(b.description).includes(keyword)
+    const matchDept     = selectedDept.value === 'Todas' || normalize(b.dept) === normalize(selectedDept.value)
+    const matchMuni     = selectedMuni.value === 'Todas' || normalize(b.muni) === normalize(selectedMuni.value)
+    const matchBarrio   = !barrioQuery || normalize(b.localidad).includes(barrioQuery)
+    const matchCategory = selectedCategories.value.length === 0 ||
+      selectedCategories.value.some(c => (b.categorias || [b.category]).map(normalize).includes(normalize(c)))
+    const matchKeyword  = !keyword || normalize(b.name).includes(keyword) || normalize(b.description).includes(keyword)
     return matchDept && matchMuni && matchBarrio && matchCategory && matchKeyword
   })
 })
 
-const categories = ref([])
 const toggleFilters = () => { if (!isDesktop.value) isFilterOpen.value = !isFilterOpen.value }
+
+const resetFilters = () => {
+  searchKeyword.value = ''
+  selectedDept.value = 'Todas'
+  selectedMuni.value = 'Todas'
+  searchBarrio.value = ''
+  selectedCategories.value = []
+  categoryDropdownOpen.value = false
+}
+
+onMounted(async () => {
+  window.addEventListener('resize', updateView)
+  updateView()
+
+  // ── Leer parámetros que vienen del buscador del Home ──
+  if (route.query.q) {
+    searchKeyword.value = route.query.q
+  }
+  if (route.query.loc) {
+    // Buscar coincidencia normalizando para ignorar tildes/mayúsculas
+    const match = Object.keys(locationsData).find(
+      d => normalize(d) === normalize(route.query.loc)
+    )
+    if (match) selectedDept.value = match
+  }
+
+  try {
+    allBusinesses.value = await getAllBusinesses()
+    categories.value = await getCategories()
+  } catch (error) {
+    console.error('Error fetching directory data:', error)
+  }
+})
 </script>
 
 <template>
   <div class="min-h-screen bg-white">
     <Navbar />
-    
+
     <div class="container mx-auto px-4 md:px-6 pt-32 pb-12">
-      <!-- Header with Toggle Button (Solo visible en celular) -->
+
+      <!-- Header -->
       <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
         <div>
           <h1 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit">Nuestro <span class="text-fiery-red">Directorio</span></h1>
           <p class="text-slate-500 font-medium mt-2">Explora los mejores negocios de toda Guatemala</p>
         </div>
-        
-        <button 
+        <button
           v-if="!isDesktop"
-          @click="toggleFilters" 
+          @click="toggleFilters"
           :class="[
             'flex lg:hidden items-center gap-3 px-8 py-4 rounded-2xl font-black transition-all shadow-xl active:scale-95',
             isFilterOpen ? 'bg-fiery-navy text-white shadow-fiery-navy/20' : 'bg-fiery-red text-white shadow-fiery-red/20'
           ]"
-        >
-          {{ isFilterOpen ? 'Cerrar Buscador' : 'Busca negocios' }}
-        </button>
+        >{{ isFilterOpen ? 'Cerrar Buscador' : 'Busca negocios' }}</button>
       </div>
 
       <div class="flex flex-col lg:flex-row gap-8">
-        <!-- Sidebar Filters: Always visible on PC, Toggleable on Mobile -->
+
+        <!-- Sidebar filtros -->
         <transition :name="isDesktop ? '' : 'slide-fade'">
           <aside v-if="isFilterOpen || isDesktop" class="w-full lg:w-[320px] shrink-0">
             <div class="bg-slate-50 rounded-[2.5rem] border border-slate-100 p-8 lg:sticky lg:top-28">
-              <h2 class="text-xl font-black text-fiery-navy mb-6 uppercase tracking-widest text-sm">Filtros</h2>
-              
+              <h2 class="text-sm font-black text-fiery-navy mb-6 uppercase tracking-widest">Filtros</h2>
+
               <div class="space-y-6">
+
+                <!-- Keyword -->
                 <div>
                   <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">¿Qué buscas?</label>
-                  <input v-model="searchKeyword" type="text" placeholder="Nombre..." class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none transition-all font-bold text-fiery-navy shadow-sm">
+                  <input
+                    v-model="searchKeyword"
+                    type="text"
+                    placeholder="Nombre del negocio..."
+                    class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none transition-all font-bold text-fiery-navy shadow-sm focus:border-fiery-red"
+                  />
                 </div>
 
+                <!-- Ubicación -->
                 <div class="space-y-4 pt-4 border-t border-slate-200">
                   <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ubicación</label>
-                  <select v-model="selectedDept" class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy appearance-none cursor-pointer shadow-sm">
+                  <select
+                    v-model="selectedDept"
+                    class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy cursor-pointer shadow-sm focus:border-fiery-red"
+                  >
                     <option v-for="dept in departments" :key="dept" :value="dept">{{ dept }}</option>
                   </select>
-                  <select v-if="selectedDept !== 'Todas'" v-model="selectedMuni" class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy appearance-none cursor-pointer shadow-sm">
+                  <select
+                    v-if="selectedDept !== 'Todas'"
+                    v-model="selectedMuni"
+                    class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy cursor-pointer shadow-sm focus:border-fiery-red"
+                  >
                     <option v-for="muni in municipalities" :key="muni" :value="muni">{{ muni }}</option>
                   </select>
-                  <input v-if="selectedMuni !== 'Todas'" v-model="searchBarrio" type="text" placeholder="Zona o Barrio..." class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy shadow-sm">
+                  <input
+                    v-if="selectedMuni !== 'Todas'"
+                    v-model="searchBarrio"
+                    type="text"
+                    placeholder="Zona o Barrio..."
+                    class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none font-bold text-fiery-navy shadow-sm focus:border-fiery-red"
+                  />
                 </div>
 
+                <!-- Categorías -->
                 <div class="pt-4 border-t border-slate-200">
                   <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Categorías</label>
-                  <div class="grid grid-cols-2 gap-2">
-                    <button v-for="cat in categories" :key="cat" @click="selectedCategory = cat" :class="[selectedCategory === cat ? 'bg-fiery-red text-white' : 'bg-white text-slate-500 hover:border-fiery-red/30', 'px-2 py-2 rounded-xl text-[10px] font-black uppercase transition-all border border-slate-100']">{{ cat }}</button>
+
+                  <!-- Dropdown trigger -->
+                  <button
+                    @click="categoryDropdownOpen = !categoryDropdownOpen"
+                    class="w-full flex items-center justify-between px-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm font-bold text-fiery-navy focus:outline-none focus:border-fiery-red transition-all"
+                  >
+                    <span class="truncate">
+                      {{ selectedCategories.length === 0 ? 'Todas las categorías' : selectedCategories.join(', ') }}
+                    </span>
+                    <svg class="w-4 h-4 shrink-0 ml-2 transition-transform" :class="categoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </button>
+
+                  <!-- Dropdown list -->
+                  <div v-if="categoryDropdownOpen" class="mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
+                    <!-- Todas -->
+                    <button
+                      @click="toggleCategory('Todas')"
+                      :class="['w-full text-left px-4 py-2.5 text-xs font-bold transition-colors flex items-center gap-2',
+                        selectedCategories.length === 0 ? 'text-fiery-red bg-fiery-red/5' : 'text-slate-500 hover:bg-slate-50']"
+                    >
+                      <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                        :class="selectedCategories.length === 0 ? 'bg-fiery-red border-fiery-red' : 'border-slate-300'">
+                        <svg v-if="selectedCategories.length === 0" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                      </span>
+                      Todas
+                    </button>
+                    <button
+                      v-for="cat in categories.filter(c => c !== 'Todas')"
+                      :key="cat"
+                      @click="toggleCategory(cat)"
+                      :class="['w-full text-left px-4 py-2.5 text-xs font-bold transition-colors flex items-center gap-2 border-t border-slate-50',
+                        selectedCategories.includes(cat) ? 'text-fiery-red bg-fiery-red/5' : 'text-slate-600 hover:bg-slate-50']"
+                    >
+                      <span class="w-4 h-4 rounded border flex items-center justify-center shrink-0"
+                        :class="selectedCategories.includes(cat) ? 'bg-fiery-red border-fiery-red' : 'border-slate-300'">
+                        <svg v-if="selectedCategories.includes(cat)" class="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                      </span>
+                      {{ cat }}
+                    </button>
+                  </div>
+
+                  <!-- Tags seleccionadas -->
+                  <div v-if="selectedCategories.length > 0" class="flex flex-wrap gap-1.5 mt-2">
+                    <span
+                      v-for="cat in selectedCategories" :key="cat"
+                      class="flex items-center gap-1 px-2.5 py-1 bg-fiery-red/10 text-fiery-red rounded-full text-[10px] font-black uppercase"
+                    >
+                      {{ cat }}
+                      <button @click="toggleCategory(cat)" class="hover:text-fiery-darkred leading-none">×</button>
+                    </span>
                   </div>
                 </div>
+
+                <!-- Reset -->
+                <button
+                  @click="resetFilters"
+                  class="w-full mt-2 py-3 rounded-2xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-fiery-red border border-slate-200 hover:border-fiery-red/30 transition-all"
+                >Reiniciar filtros</button>
+
               </div>
             </div>
           </aside>
         </transition>
 
-        <!-- Results Grid -->
+        <!-- Resultados -->
         <main class="flex-1">
+          <!-- Indicador de filtro activo -->
+          <div v-if="selectedDept !== 'Todas'" class="mb-6 flex items-center gap-3 flex-wrap">
+            <span class="text-xs font-black text-slate-400 uppercase tracking-widest">Mostrando en:</span>
+            <span class="px-4 py-1.5 bg-fiery-red/10 text-fiery-red rounded-full text-xs font-black uppercase">
+              {{ selectedDept }}{{ selectedMuni !== 'Todas' ? ' — ' + selectedMuni : '' }}
+            </span>
+            <button @click="resetFilters" class="text-xs text-slate-400 hover:text-fiery-red underline font-semibold transition-colors">Quitar filtro</button>
+          </div>
+
           <div v-if="filteredBusinesses.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             <BusinessCard v-for="business in filteredBusinesses" :key="business.id" :business="business" />
           </div>
+
           <div v-else class="bg-white rounded-[3rem] p-16 text-center border border-slate-100">
-            <h3 class="text-3xl font-black text-fiery-navy mb-4 font-outfit uppercase">Sin resultados</h3>
-            <button @click="() => { searchKeyword = ''; selectedDept = 'Todas'; }" class="bg-fiery-red text-white font-black px-8 py-4 rounded-2xl">Reiniciar filtros</button>
+           
+            <h3 class="text-3xl font-black text-fiery-navy mb-2 font-outfit uppercase">Sin resultados</h3>
+            <p class="text-slate-400 mb-8 font-medium">
+              No encontramos negocios
+              <span v-if="selectedDept !== 'Todas'">en <strong>{{ selectedDept }}</strong></span>
+              <span v-if="searchKeyword"> con "<strong>{{ searchKeyword }}</strong>"</span>.
+            </p>
+            <button @click="resetFilters" class="bg-fiery-red text-white font-black px-8 py-4 rounded-2xl hover:bg-fiery-darkred transition-all">
+              Reiniciar filtros
+            </button>
           </div>
         </main>
+
       </div>
     </div>
   </div>

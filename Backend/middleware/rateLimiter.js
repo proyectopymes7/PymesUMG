@@ -4,8 +4,8 @@ const logger = require('../utils/logger');
 // General rate limiter
 const rateLimiter = new RateLimiterMemory({
   keyGenerator: (req) => req.ip,
-  points: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
-  duration: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 900, // 15 minutes in seconds
+  points: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000,
+  duration: 60, // 1 minuto fijo para evitar bloqueos largos en desarrollo local
 });
 
 // Auth endpoints stricter rate limiting
