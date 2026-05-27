@@ -6,6 +6,7 @@ import BlogView from '../views/BlogView.vue'
 import AdminDashboardView from '../views/AdminDashboardView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
+import EditProfileView from '../views/ProfileView.vue'
 import { useAuthStore } from '../stores/auth'
 import ImageUploadTestView from '../views/ImageUploadTestView.vue'
 
@@ -48,6 +49,12 @@ const router = createRouter({
       component: RegisterView
     },
     {
+      path: '/perfil',
+      name: 'edit-profile',
+      component: EditProfileView,
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/test-upload',
       name: 'test-upload',
       component: ImageUploadTestView
@@ -59,6 +66,9 @@ router.beforeEach((to) => {
   const authStore = useAuthStore()
   if (to.path.startsWith('/admin') && !authStore.hasAdminPanel) {
     return authStore.isAuthenticated ? '/' : '/login'
+  }
+  if (to.meta?.requiresAuth && !authStore.isAuthenticated) {
+    return '/login'
   }
   if ((to.path === '/login' || to.path === '/register') && authStore.isAuthenticated) {
     return '/'

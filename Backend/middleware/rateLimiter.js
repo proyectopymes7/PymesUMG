@@ -1,24 +1,26 @@
 const { RateLimiterMemory } = require('rate-limiter-flexible');
 const logger = require('../utils/logger');
 
+const isProd = process.env.NODE_ENV === 'production';
+
 // General rate limiter
 const rateLimiter = new RateLimiterMemory({
   keyGenerator: (req) => req.ip,
-  points: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 1000,
+  points: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || (isProd ? 100 : 1000),
   duration: 60, // 1 minuto fijo para evitar bloqueos largos en desarrollo local
 });
 
 // Auth endpoints stricter rate limiting
 const authRateLimiter = new RateLimiterMemory({
   keyGenerator: (req) => req.ip,
-  points: 5, // 5 attempts
-  duration: 900, // per 15 minutes
+  points: isProd ? 5 : 100, // 5 attempts in prod, 100 in dev
+  duration: isProd ? 900 : 60, // 15 minutes in prod, 1 minute in dev
 });
 
 // Search rate limiting
 const searchRateLimiter = new RateLimiterMemory({
   keyGenerator: (req) => req.ip,
-  points: 30,
+  points: isProd ? 30 : 300,
   duration: 60, // per minute
 });
 
