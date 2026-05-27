@@ -20,23 +20,34 @@ let searchTimer = null
 
 const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 
-const loadGoogleMaps = () => {
+const loadGoogleMaps = async () => {
+  if (window.google?.maps?.marker) return
+
+  // Si el objeto google.maps ya existe (por HMR o script anterior), cargamos la librería dinámicamente
+  if (window.google?.maps?.importLibrary) {
+    try {
+      await window.google.maps.importLibrary("marker")
+      return
+    } catch (e) {
+      console.warn("Could not import marker library dynamically", e)
+    }
+  }
+
   return new Promise((resolve, reject) => {
-    if (window.google?.maps) { resolve(); return }
     const existing = document.querySelector('script[data-gmaps]')
     if (existing) {
       const poll = setInterval(() => {
-        if (window.google?.maps) { clearInterval(poll); resolve() }
+        if (window.google?.maps?.marker) { clearInterval(poll); resolve() }
       }, 50)
       setTimeout(() => { clearInterval(poll); reject(new Error('timeout')) }, 10000)
       return
     }
+    window.__gmapsCallback = resolve
     const script = document.createElement('script')
     script.setAttribute('data-gmaps', '1')
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}&v=weekly`
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${MAPS_KEY}&v=weekly&loading=async&libraries=marker&callback=__gmapsCallback`
     script.async = true
     script.defer = true
-    script.onload = resolve
     script.onerror = reject
     document.head.appendChild(script)
   })
@@ -78,8 +89,8 @@ const fetchSuggestions = async (text) => {
 
 const placeMarker = (lat, lng) => {
   if (!map || !marker) return
-  marker.setPosition({ lat, lng })
-  marker.setVisible(true)
+  marker.position = { lat, lng }
+  marker.map = map
   map.panTo({ lat, lng })
   map.setZoom(15)
 }
@@ -144,25 +155,24 @@ onMounted(async () => {
   map = new window.google.maps.Map(mapContainer.value, {
     center: initialCenter,
     zoom: hasInitial ? 15 : 7,
+    mapId: 'DEMO_MAP_ID',
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
     zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER }
   })
 
-  marker = new window.google.maps.Marker({
+  marker = new window.google.maps.marker.AdvancedMarkerElement({
     position: initialCenter,
-    map,
-    draggable: !props.readonly,
-    visible: hasInitial,
-    animation: window.google.maps.Animation.DROP
+    map: hasInitial ? map : null,
+    gmpDraggable: !props.readonly
   })
 
   if (!props.readonly) {
     marker.addListener('dragend', async () => {
-      const pos = marker.getPosition()
-      const lat = pos.lat()
-      const lng = pos.lng()
+      const pos = marker.position
+      const lat = typeof pos.lat === 'function' ? pos.lat() : pos.lat
+      const lng = typeof pos.lng === 'function' ? pos.lng() : pos.lng
       const addr = await reverseGeocode(lat, lng)
       emitFull(lat, lng, addr)
     })
@@ -180,8 +190,8 @@ onMounted(async () => {
 watch(() => props.modelValue, (val) => {
   if (!map || !marker || !val?.lat) return
   const pos = { lat: Number(val.lat), lng: Number(val.lng) }
-  marker.setPosition(pos)
-  marker.setVisible(true)
+  marker.position = pos
+  marker.map = map
   map.panTo(pos)
 }, { deep: true })
 </script>
