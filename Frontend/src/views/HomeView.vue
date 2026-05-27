@@ -268,7 +268,7 @@ onUnmounted(() => {
     <section class="dir-section">
       <div class="dir-bg-wrap" aria-hidden="true">
         <img
-          src="https://images.unsplash.com/photo-1548013146-72479768bada?q=80&w=1600&auto=format&fit=crop"
+          src="@/assets/Volcan.webp"
           class="dir-bg-img"
           alt="Lago de Atitlán, Guatemala"
         />

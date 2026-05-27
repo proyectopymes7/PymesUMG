@@ -1,10 +1,11 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import umgLogo from '../../assets/UMG.png'
 
 const route = useRoute()
+const router = useRouter()
 const isMenuOpen = ref(false)
 const isUserDropdownOpen = ref(false)
 const isScrolled = ref(false)
@@ -28,11 +29,16 @@ onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
 })
 
-
 const handleLogout = () => {
   authStore.logout()
   isMenuOpen.value = false
   isUserDropdownOpen.value = false
+}
+
+const goToProfile = () => {
+  isUserDropdownOpen.value = false
+  isMenuOpen.value = false
+  router.push('/perfil')
 }
 </script>
 
@@ -46,6 +52,7 @@ const handleLogout = () => {
     ]"
   >
     <div class="max-w-7xl mx-auto flex items-center justify-between">
+
       <!-- Logo -->
       <RouterLink to="/" class="flex items-center gap-3 group">
         <img :src="umgLogo" alt="UMG" class="w-10 h-10 md:w-12 md:h-12 object-contain" />
@@ -63,37 +70,84 @@ const handleLogout = () => {
         </RouterLink>
       </div>
 
-      <!-- Actions (Desktop + Hamburger Toggle) -->
+      <!-- Actions -->
       <div class="flex items-center gap-4">
+
         <!-- Desktop User Dropdown -->
         <div v-if="authStore.isAuthenticated" class="hidden sm:block relative user-menu-container">
+
+          <!-- Botón con foto + nombre -->
           <button @click="toggleUserDropdown" class="flex items-center gap-3 bg-slate-100/10 hover:bg-slate-100/20 backdrop-blur-md p-1.5 pr-4 rounded-2xl transition-all border border-white/10">
-            <div class="w-10 h-10 bg-fiery-red rounded-xl flex items-center justify-center text-white font-black shadow-lg">
-              {{ authStore.userInitial }}
+            <div class="w-10 h-10 rounded-xl overflow-hidden shadow-lg flex-shrink-0">
+              <img
+                v-if="authStore.user?.foto_perfil"
+                :src="authStore.user.foto_perfil"
+                class="w-full h-full object-cover"
+                alt="Foto de perfil"
+              />
+              <div v-else class="w-full h-full bg-fiery-red flex items-center justify-center text-white font-black text-sm">
+                {{ authStore.userInitial }}
+              </div>
             </div>
+            <!-- Nombre completo al lado de la foto — reactivo al store -->
+            <span class="text-[10px] font-black uppercase tracking-wider hidden md:block max-w-[200px] truncate">{{ authStore.userFullName }}</span>
           </button>
+
           <transition name="menu-fade">
             <div v-if="isUserDropdownOpen" class="absolute top-full right-0 mt-4 w-64 bg-white rounded-3xl shadow-2xl border border-slate-100 p-3 flex flex-col gap-1">
-              <div class="px-5 py-4 border-b border-slate-50 mb-2">
-                <p class="text-xs font-black text-fiery-navy uppercase">{{ authStore.userFullName }}</p>
-                <p class="text-[10px] text-slate-400 truncate">{{ authStore.user?.correo }}</p>
+
+              <!-- Info usuario en el dropdown -->
+              <div class="px-5 py-4 border-b border-slate-50 mb-1 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
+                  <img
+                    v-if="authStore.user?.foto_perfil"
+                    :src="authStore.user.foto_perfil"
+                    class="w-full h-full object-cover"
+                  />
+                  <div v-else class="w-full h-full bg-fiery-red flex items-center justify-center text-white font-black text-sm">
+                    {{ authStore.userInitial }}
+                  </div>
+                </div>
+                <div class="min-w-0">
+                  <p class="text-xs font-black text-fiery-navy uppercase truncate">{{ authStore.userFullName }}</p>
+                  <p class="text-[10px] text-slate-400 truncate">{{ authStore.user?.correo }}</p>
+                </div>
               </div>
-              <button @click="handleLogout" class="flex items-center gap-3 px-5 py-3 rounded-2xl hover:bg-red-50 text-fiery-red transition-all">
+
+              <!-- Editar perfil -->
+              <button
+                @click="goToProfile"
+                class="flex items-center gap-3 px-5 py-3 rounded-2xl hover:bg-slate-50 text-fiery-navy transition-all w-full text-left"
+              >
+                <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                <span class="text-[11px] font-black uppercase tracking-widest">Editar Perfil</span>
+              </button>
+
+              <!-- Cerrar sesión -->
+              <button
+                @click="handleLogout"
+                class="flex items-center gap-3 px-5 py-3 rounded-2xl hover:bg-red-50 text-fiery-red transition-all w-full text-left"
+              >
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
                 <span class="text-[11px] font-black uppercase tracking-widest">Cerrar Sesión</span>
               </button>
             </div>
           </transition>
         </div>
 
-        <!-- Desktop Login (Hidden on Mobile) -->
+        <!-- Desktop Login -->
         <div v-else class="hidden sm:block">
           <RouterLink to="/login" class="flex items-center gap-2 bg-fiery-red hover:bg-fiery-darkred text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-xl shadow-fiery-red/20 active:scale-95">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
             Ingresar
           </RouterLink>
         </div>
-        
-        <!-- Hamburger Button (Visible only on Mobile) -->
+
+        <!-- Hamburger -->
         <button @click="toggleMenu" class="lg:hidden w-12 h-12 flex flex-col items-center justify-center gap-1.5 bg-slate-100 rounded-xl text-fiery-navy" aria-label="Toggle Menu">
           <span :class="['w-6 h-0.5 bg-current transition-all duration-300', isMenuOpen ? 'rotate-45 translate-y-2' : '']"></span>
           <span :class="['w-6 h-0.5 bg-current transition-all duration-300', isMenuOpen ? 'opacity-0' : '']"></span>
@@ -102,19 +156,30 @@ const handleLogout = () => {
       </div>
     </div>
 
-    <!-- Mobile Menu Overlay -->
+    <!-- Mobile Menu -->
     <transition name="menu-fade">
       <div v-if="isMenuOpen" class="lg:hidden absolute top-full left-0 w-full bg-white shadow-2xl border-t border-slate-100 py-8 px-6 space-y-6 flex flex-col items-center text-center">
         <RouterLink @click="isMenuOpen = false" to="/" class="text-xl font-black">Inicio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/directorio" class="text-xl font-black">Directorio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/blog" class="text-xl font-black">Blog</RouterLink>
         <RouterLink v-if="authStore.hasAdminPanel" @click="isMenuOpen = false" to="/admin" class="text-xl font-black text-fiery-red">Panel Admin</RouterLink>
-        
-        <div v-if="authStore.isAuthenticated" class="w-full flex flex-col items-center border-t pt-6">
-          <p class="font-black mb-4">{{ authStore.userFullName }}</p>
-          <button @click="handleLogout" class="w-full bg-slate-100 py-4 rounded-2xl font-black uppercase text-xs">Cerrar Sesión</button>
+
+        <div v-if="authStore.isAuthenticated" class="w-full flex flex-col items-center border-t pt-6 gap-3">
+          <div class="w-16 h-16 rounded-full overflow-hidden shadow-md border-4 border-slate-100 mx-auto">
+            <img
+              v-if="authStore.user?.foto_perfil"
+              :src="authStore.user.foto_perfil"
+              class="w-full h-full object-cover"
+            />
+            <div v-else class="w-full h-full bg-fiery-red flex items-center justify-center text-white font-black text-2xl">
+              {{ authStore.userInitial }}
+            </div>
+          </div>
+          <p class="font-black text-fiery-navy">{{ authStore.userFullName }}</p>
+          <button @click="goToProfile" class="w-full bg-fiery-navy text-white py-4 rounded-2xl font-black uppercase text-xs tracking-widest">Editar Perfil</button>
+          <button @click="handleLogout" class="w-full bg-slate-100 py-4 rounded-2xl font-black uppercase text-xs text-fiery-red">Cerrar Sesión</button>
         </div>
-        <!-- Mobile Login Button inside menu -->
+
         <div v-else class="w-full pt-4">
           <RouterLink @click="isMenuOpen = false" to="/login" class="w-full flex items-center justify-center gap-3 bg-fiery-red hover:bg-fiery-darkred text-white py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-[0.2em] transition-all shadow-2xl shadow-fiery-red/30 active:scale-[0.98]">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
