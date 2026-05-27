@@ -79,7 +79,6 @@ const loginWithGoogle = () => {
         background-image: url('/src/assets/AntiguaVolcan.webp');
         background-size: cover;
         background-position: center;
-        background-size: 100%;
         background-repeat: no-repeat;
       "
     >
