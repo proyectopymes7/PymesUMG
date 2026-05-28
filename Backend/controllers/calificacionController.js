@@ -17,7 +17,7 @@ const createCalificacion = async (req, res) => {
     }
 
     try {
-        const { id_emprendimiento, puntuacion, comentario } = req.body;
+        const { id_emprendimiento, puntuacion } = req.body;
         const id_usuario = req.user.id_usuario;
 
         const existingRating = await Calificacion.findUserRating(id_usuario, id_emprendimiento);
@@ -32,8 +32,7 @@ const createCalificacion = async (req, res) => {
         const newRatingData = await Calificacion.create({
             id_usuario,
             id_emprendimiento,
-            puntuacion,
-            comentario
+            puntuacion
         });
 
         logger.info('Calificación creada', {
