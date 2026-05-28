@@ -14,6 +14,7 @@ const publicacionesRoutes = require('./routes/publicaciones');
 const estadisticasRoutes = require('./routes/estadisticas');
 const valoracionesRoutes = require('./routes/valoraciones');
 const sugerenciasRoutes = require('./routes/sugerencias');
+const calificacionesRoutes = require('./routes/calificaciones');
 
 const errorHandler = require('./middleware/errorHandler');
 const { rateLimiterMiddleware } = require('./middleware/rateLimiter');
@@ -126,6 +127,7 @@ app.use('/api/publicaciones', publicacionesRoutes);
 app.use('/api/estadisticas', estadisticasRoutes);
 app.use('/api/valoraciones', valoracionesRoutes);
 app.use('/api/sugerencias', sugerenciasRoutes);
+app.use('/api/calificaciones', calificacionesRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -160,6 +162,47 @@ app.listen(PORT, async () => {
     logger.info('EmprendimientoCategorias table ready');
   } catch (err) {
     logger.error('Failed to ensure EmprendimientoCategorias table:', err.message);
+  }
+
+  // Ensure CALIFICACIONES table exists
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CALIFICACIONES')
+      CREATE TABLE CALIFICACIONES (
+        id_calificacion   INT IDENTITY(1,1) PRIMARY KEY,
+        id_usuario        INT NOT NULL,
+        id_emprendimiento INT NOT NULL,
+        puntuacion        INT NOT NULL,
+        comentario        NVARCHAR(1000) NULL,
+        fecha_calificacion DATETIME DEFAULT GETDATE(),
+        FOREIGN KEY (id_usuario)        REFERENCES Usuarios(id_usuario),
+        FOREIGN KEY (id_emprendimiento) REFERENCES Emprendimientos(id_emprendimiento) ON DELETE CASCADE
+      )
+    `);
+    logger.info('CALIFICACIONES table ready');
+  } catch (err) {
+    logger.error('Failed to ensure CALIFICACIONES table:', err.message);
+  }
+
+  // Ensure IMAGENES_PRODUCTO table exists
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'IMAGENES_PRODUCTO')
+      CREATE TABLE IMAGENES_PRODUCTO (
+        id_imagen_producto INT IDENTITY(1,1) PRIMARY KEY,
+        id_producto        INT NOT NULL,
+        url                NVARCHAR(500) NOT NULL,
+        descripcion        NVARCHAR(200) NULL,
+        orden              INT DEFAULT 0,
+        fecha_subida       DATETIME DEFAULT GETDATE(),
+        FOREIGN KEY (id_producto) REFERENCES ProductosServicios(id_producto) ON DELETE CASCADE
+      )
+    `);
+    logger.info('IMAGENES_PRODUCTO table ready');
+  } catch (err) {
+    logger.error('Failed to ensure IMAGENES_PRODUCTO table:', err.message);
   }
 
   // Add foto_perfil column to Usuarios if it doesn't exist

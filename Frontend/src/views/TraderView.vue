@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import { useAuthStore } from '../stores/auth'
-import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage } from '../services/businessService'
+import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage, uploadProductImage } from '../services/businessService'
 import api from '../services/api'
 
 const router = useRouter()
@@ -170,7 +170,7 @@ const loadingProducts = ref(false)
 const showProductForm = ref(false)
 const editingProduct = ref(null)
 const deletingId = ref(null)
-const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '' })
+const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
 const productImageFile = ref(null)
 const productImagePreview = ref(null)
 const productFileInputRef = ref(null)
@@ -183,7 +183,7 @@ const clearProductImage = () => { productImageFile.value = null; productImagePre
 
 const openNewProduct = () => {
   editingProduct.value = null
-  productForm.value = { tipo: 'producto', nombre: '', descripcion: '' }
+  productForm.value = { tipo: 'producto', nombre: '', descripcion: '', precio: '' }
   productImageFile.value = null
   productImagePreview.value = null
   showProductForm.value = true
@@ -191,7 +191,7 @@ const openNewProduct = () => {
 
 const openEditProduct = (prod) => {
   editingProduct.value = prod
-  productForm.value = { tipo: prod.tipo?.toLowerCase() || 'producto', nombre: prod.nombre, descripcion: prod.descripcion || '' }
+  productForm.value = { tipo: prod.tipo?.toLowerCase() || 'producto', nombre: prod.nombre, descripcion: prod.descripcion || '', precio: prod.precio ?? '' }
   productImageFile.value = null
   productImagePreview.value = prod.imagen_url || null
   showProductForm.value = true
@@ -220,10 +220,11 @@ const saveProduct = async () => {
       savedId = res.data?.data?.id_producto || res.data?.id_producto
     }
     if (productImageFile.value && savedId) {
-      const fd = new FormData()
-      fd.append('imagen', productImageFile.value)
-      try { await api.post(`/imagenes/producto/${savedId}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }) }
-      catch (e) { showToast('Guardado, pero falló la imagen', 'error') }
+      try {
+        const imgUrl = await uploadProductImage(productImageFile.value, savedId)
+        productImagePreview.value = imgUrl
+        productImageFile.value = null
+      } catch (e) { showToast('Guardado, pero falló la imagen', 'error') }
     }
     showToast(editingProduct.value ? 'Producto actualizado' : 'Producto creado')
     showProductForm.value = false
@@ -615,6 +616,11 @@ const saveGeneral = async () => {
             class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
           <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
             class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
+            <input v-model="productForm.precio" placeholder="Precio (opcional)" type="number" min="0" step="0.01"
+              class="w-full border border-slate-200 bg-slate-50 rounded-xl pl-7 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
+          </div>
 
           <!-- Imagen producto -->
           <input type="file" ref="productFileInputRef" accept="image/*" class="hidden" @change="handleProductImageChange" />

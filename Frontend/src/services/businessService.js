@@ -235,7 +235,7 @@ export const getBusinessProducts = async (businessId) => {
 
 export const getBusinessReviews = async (businessId) => {
   try {
-    const response = await api.get(`/valoraciones/emprendimiento/${businessId}`);
+    const response = await api.get(`/calificaciones/emprendimiento/${businessId}`);
     if (response.data.success && response.data.data) {
       return response.data.data;
     }
@@ -305,10 +305,10 @@ export const deleteBusinessById = async (id) => {
 
 export const createReview = async ({ id_emprendimiento, comentario, calificacion }) => {
   try {
-    const response = await api.post('/valoraciones', {
+    const response = await api.post('/calificaciones', {
       id_emprendimiento,
       comentario,
-      calificacion
+      puntuacion: calificacion
     });
     return response.data;
   } catch (error) {

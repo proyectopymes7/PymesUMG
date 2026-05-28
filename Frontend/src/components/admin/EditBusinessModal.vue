@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { getRawCategories } from '../../services/businessService'
+import { getRawCategories, uploadProductImage } from '../../services/businessService'
 import api from '../../services/api'
 import LocationPicker from '../shared/LocationPicker.vue'
 
@@ -60,7 +60,7 @@ const products = ref([])
 const loadingProducts = ref(false)
 const showProductForm = ref(false)
 const editingProduct = ref(null)
-const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '' })
+const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
 const deletingId = ref(null)
 
 // Product Image State
@@ -253,7 +253,7 @@ const saveGeneral = async () => {
 // Product Actions
 const openNewProduct = () => {
   editingProduct.value = null
-  productForm.value = { tipo: 'producto', nombre: '', descripcion: '' }
+  productForm.value = { tipo: 'producto', nombre: '', descripcion: '', precio: '' }
   productImageFile.value = null
   productImagePreview.value = null
   showProductForm.value = true
@@ -261,10 +261,11 @@ const openNewProduct = () => {
 
 const openEditProduct = (prod) => {
   editingProduct.value = prod
-  productForm.value = { 
-    tipo: prod.tipo?.toLowerCase() || 'producto', 
-    nombre: prod.nombre, 
-    descripcion: prod.descripcion 
+  productForm.value = {
+    tipo: prod.tipo?.toLowerCase() || 'producto',
+    nombre: prod.nombre,
+    descripcion: prod.descripcion,
+    precio: prod.precio ?? ''
   }
   productImageFile.value = null
   productImagePreview.value = prod.imagen_url || null
@@ -297,12 +298,9 @@ const saveProduct = async () => {
     let imageFailed = false
     if (productImageFile.value && savedProductId) {
       try {
-        const formData = new FormData()
-        formData.append('imagen', productImageFile.value)
-
-        await api.post(`/imagenes/producto/${savedProductId}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const imgUrl = await uploadProductImage(productImageFile.value, savedProductId)
+        productImagePreview.value = imgUrl
+        productImageFile.value = null
       } catch (imgError) {
         console.error('Error al subir imagen:', imgError)
         imageFailed = true
@@ -504,7 +502,12 @@ const executeDelete = async (id) => {
               </div>
               <input v-model="productForm.nombre" placeholder="Nombre" type="text" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-fiery-navy font-bold text-slate-800" />
               <textarea v-model="productForm.descripcion" placeholder="Descripción" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-fiery-navy text-slate-600"></textarea>
-              
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
+                <input v-model="productForm.precio" placeholder="Precio (opcional)" type="number" min="0" step="0.01"
+                  class="w-full border border-slate-200 bg-slate-50 rounded-xl pl-7 pr-4 py-2 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
+              </div>
+
               <!-- Image Upload Area -->
               <div class="mt-2">
                 <input type="file" ref="fileInputRef" accept="image/*" class="hidden" @change="handleProductImageChange" />

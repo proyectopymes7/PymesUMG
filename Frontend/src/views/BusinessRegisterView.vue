@@ -94,7 +94,7 @@ const toggleDay = (day) => {
 const products = ref([])
 const showProductForm = ref(false)
 const editingProduct = ref(null)
-const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '' })
+const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
 const productImageFile = ref(null)
 const productImagePreview = ref(null)
 const fileInputRef = ref(null)
@@ -123,7 +123,7 @@ const openNewProduct = () => {
 
 const openEditProduct = (prod) => {
   editingProduct.value = prod
-  productForm.value = { tipo: prod.tipo || 'producto', nombre: prod.nombre, descripcion: prod.descripcion || '' }
+  productForm.value = { tipo: prod.tipo || 'producto', nombre: prod.nombre, descripcion: prod.descripcion || '', precio: prod.precio ?? '' }
   productImageFile.value = null
   productImagePreview.value = prod.imagen || null
   showProductForm.value = true
@@ -148,6 +148,7 @@ const saveProductLocal = () => {
     products.value.push({
       _localId: Date.now(),
       ...productForm.value,
+      precio: productForm.value.precio ? Number(productForm.value.precio) : null,
       imagen: productImagePreview.value,
       imageFile: productImageFile.value
     })
@@ -251,7 +252,8 @@ const submitRequest = async () => {
             id_emprendimiento: newId,
             nombre:      prod.nombre,
             descripcion: prod.descripcion || '',
-            tipo:        prod.tipo
+            tipo:        prod.tipo,
+            ...(prod.precio ? { precio: Number(prod.precio) } : {})
           }
           const prodRes = await api.post('/productos', prodPayload)
           const prodId = prodRes.data?.data?.id_producto || prodRes.data?.id_producto
@@ -529,6 +531,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
             <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
               class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+            <div class="relative">
+              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
+              <input v-model="productForm.precio" placeholder="Precio (opcional)" type="number" min="0" step="0.01"
+                class="w-full border border-slate-200 bg-white rounded-xl pl-7 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
+            </div>
 
             <!-- Imagen -->
             <input type="file" ref="fileInputRef" accept="image/*" class="hidden" @change="handleProductImageChange" />

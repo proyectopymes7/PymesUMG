@@ -34,7 +34,7 @@ class ProductoServicio {
     const query = `
       SELECT ps.*, 
              e.nombre as emprendimiento_nombre,
-             (SELECT COUNT(*) FROM ImagenesProducto WHERE id_producto = @id_producto) as total_imagenes
+             (SELECT COUNT(*) FROM IMAGENES_PRODUCTO WHERE id_producto = @id_producto) as total_imagenes
       FROM ProductosServicios ps
       LEFT JOIN Emprendimientos e ON ps.id_emprendimiento = e.id_emprendimiento
       WHERE ps.id_producto = @id_producto;
@@ -53,8 +53,8 @@ class ProductoServicio {
   static async findByEmprendimiento(id_emprendimiento, filters = {}) {
     let query = `
       SELECT ps.*,
-             (SELECT TOP 1 url FROM ImagenesProducto WHERE id_producto = ps.id_producto ORDER BY id_imagen ASC) as imagen_url,
-             (SELECT COUNT(*) FROM ImagenesProducto WHERE id_producto = ps.id_producto) as total_imagenes
+             (SELECT TOP 1 url FROM IMAGENES_PRODUCTO WHERE id_producto = ps.id_producto ORDER BY id_imagen_producto ASC) as imagen_url,
+             (SELECT COUNT(*) FROM IMAGENES_PRODUCTO WHERE id_producto = ps.id_producto) as total_imagenes
       FROM ProductosServicios ps
       WHERE ps.id_emprendimiento = @id_emprendimiento
     `;
@@ -94,7 +94,7 @@ class ProductoServicio {
     let query = `
       SELECT ps.*, 
              e.nombre as emprendimiento_nombre,
-             (SELECT COUNT(*) FROM ImagenesProducto WHERE id_producto = ps.id_producto) as total_imagenes
+             (SELECT COUNT(*) FROM IMAGENES_PRODUCTO WHERE id_producto = ps.id_producto) as total_imagenes
       FROM ProductosServicios ps
       LEFT JOIN Emprendimientos e ON ps.id_emprendimiento = e.id_emprendimiento
       WHERE 1=1
@@ -153,7 +153,7 @@ class ProductoServicio {
     let query = `
       SELECT ps.*, 
              e.nombre as emprendimiento_nombre,
-             (SELECT COUNT(*) FROM ImagenesProducto WHERE id_producto = ps.id_producto) as total_imagenes
+             (SELECT COUNT(*) FROM IMAGENES_PRODUCTO WHERE id_producto = ps.id_producto) as total_imagenes
       FROM ProductosServicios ps
       LEFT JOIN Emprendimientos e ON ps.id_emprendimiento = e.id_emprendimiento
       WHERE ps.nombre LIKE @term

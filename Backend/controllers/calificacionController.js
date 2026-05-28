@@ -56,7 +56,7 @@ const createCalificacion = async (req, res) => {
 
 const getCalificacionesByEmprendimiento = async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id_emprendimiento || req.params.id;
         const calificaciones = await Calificacion.findByEmprendimiento(id);
         
         res.json({
