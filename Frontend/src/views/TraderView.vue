@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import { useAuthStore } from '../stores/auth'
-import { getMyBusinesses, getRawCategories, updateBusinessData, getBusinessProducts } from '../services/businessService'
+import { getMyBusinesses, getRawCategories, updateBusinessData, getBusinessProducts, uploadImage } from '../services/businessService'
 import api from '../services/api'
 
 const router = useRouter()
@@ -249,14 +249,14 @@ const saveGeneral = async () => {
 
     await updateBusinessData(business.value.id, payload)
 
-    // Subir logo si hay
+    // Subir logo si hay (2 pasos: upload → URL → guardar en negocio)
     if (logoFile.value) {
       try {
-        const fd = new FormData()
-        fd.append('imagen', logoFile.value)
-        await api.post(`/imagenes/emprendimiento/${business.value.id}`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const logoUrl = await uploadImage(logoFile.value, 'logos')
+        await updateBusinessData(business.value.id, { logo_url: logoUrl })
+        business.value = { ...business.value, logo: logoUrl, image: logoUrl }
+        logoPreview.value = logoUrl
+        logoFile.value = null
       } catch (e) { showToast('Datos guardados, pero falló la foto', 'error') }
     }
 

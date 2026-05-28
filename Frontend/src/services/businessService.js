@@ -246,6 +246,19 @@ export const getBusinessReviews = async (businessId) => {
   }
 };
 
+// Generic two-step upload: sends file to /imagenes/upload, returns the URL.
+// tipo: 'logos' | 'imagenes' | 'perfiles'
+export const uploadImage = async (file, tipo = 'imagenes') => {
+  const fd = new FormData();
+  fd.append('imagen', file);
+  fd.append('tipo', tipo);
+  const response = await api.post('/imagenes/upload', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  if (!response.data?.url) throw new Error('No se recibió URL de la imagen');
+  return response.data.url;
+};
+
 export const createReview = async ({ id_emprendimiento, comentario, calificacion }) => {
   try {
     const response = await api.post('/valoraciones', {

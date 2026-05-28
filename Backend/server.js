@@ -162,6 +162,21 @@ app.listen(PORT, async () => {
     logger.error('Failed to ensure EmprendimientoCategorias table:', err.message);
   }
 
+  // Add foto_perfil column to Usuarios if it doesn't exist
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (
+        SELECT * FROM sys.columns
+        WHERE object_id = OBJECT_ID('Usuarios') AND name = 'foto_perfil'
+      )
+      ALTER TABLE Usuarios ADD foto_perfil NVARCHAR(500) NULL
+    `);
+    logger.info('foto_perfil column ready');
+  } catch (err) {
+    logger.error('Failed to add foto_perfil column:', err.message);
+  }
+
   // Drop any CHECK constraint on estado so ACTIVO/INACTIVO are accepted
   try {
     const pool = await connectDB();

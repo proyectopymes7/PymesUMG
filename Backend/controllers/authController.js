@@ -122,10 +122,10 @@ const login = async (req, res) => {
       if (attempts >= 5) {
         const blockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
         await User.blockUser(user.id_usuario, blockUntil);
-        
-        logger.warn(`User blocked due to failed attempts: ${correo}`, { 
-          ip: req.ip, 
-          attempts 
+
+        logger.warn(`User blocked due to failed attempts: ${correo}`, {
+          ip: req.ip,
+          attempts
         });
 
         return res.status(401).json({
@@ -201,7 +201,7 @@ const googleLogin = async (req, res) => {
         id_rol: 4, // Default: Visitante
         activo: 1
       };
-      
+
       const newUserResult = await User.create(userData);
       user = await User.findById(newUserResult.id_usuario);
       logger.info(`New user created via Google: ${email}`);
@@ -260,11 +260,12 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    const { nombre, apellido } = req.body;
+    const { nombre, apellido, foto_perfil } = req.body;
     const updateData = {};
 
     if (nombre !== undefined) updateData.nombre = nombre;
     if (apellido !== undefined) updateData.apellido = apellido;
+    if (foto_perfil !== undefined) updateData.foto_perfil = foto_perfil;
 
     const updatedUser = await User.update(req.user.id_usuario, updateData);
     delete updatedUser.password_hash;
@@ -360,7 +361,7 @@ module.exports = {
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters long')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+      .withMessage('La contraseña debe contener al menos una letra mayúscula, una minúscula, y un número')
   ],
   validateLogin: [
     body('correo')
@@ -381,7 +382,11 @@ module.exports = {
       .optional()
       .trim()
       .isLength({ min: 2, max: 50 })
-      .withMessage('Apellido must be between 2 and 50 characters')
+      .withMessage('Apellido must be between 2 and 50 characters'),
+    body('foto_perfil')
+      .optional({ checkFalsy: true })
+      .isURL()
+      .withMessage('foto_perfil must be a valid URL')
   ],
   validateChangePassword: [
     body('currentPassword')
@@ -391,6 +396,6 @@ module.exports = {
       .isLength({ min: 8 })
       .withMessage('New password must be at least 8 characters long')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('New password must contain at least one uppercase letter, one lowercase letter, and one number')
+      .withMessage('New La contraseña debe contener al menos una letra mayúscula, una minúscula, y un número')
   ]
 };

@@ -31,6 +31,30 @@ router.get('/producto/:id_producto', optionalAuth, async (req, res) => {
   }
 });
 
+// ─── POST: subir imagen genérica y devolver solo la URL ──────────────────────
+// Body: multipart, campo "imagen". Query/body campo "tipo": logos | imagenes | perfiles
+
+router.post('/upload', auth, upload.single('imagen'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se recibió ninguna imagen' });
+    }
+
+    const tipo = req.body.tipo || 'imagenes';
+    const containers = {
+      logos:    process.env.AZURE_STORAGE_CONTAINER_LOGOS,
+      imagenes: process.env.AZURE_STORAGE_CONTAINER_IMAGENES,
+      perfiles: process.env.AZURE_STORAGE_CONTAINER_PERFILES || process.env.AZURE_STORAGE_CONTAINER_LOGOS
+    };
+    const container = containers[tipo] || process.env.AZURE_STORAGE_CONTAINER_IMAGENES;
+
+    const url = await subirImagen(req.file.buffer, req.file.originalname, container);
+    res.json({ success: true, url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── POST: subir logo del emprendimiento ──────────────────────────────────────
 
 router.post('/logo/:id_emprendimiento', auth, upload.single('logo'), async (req, res) => {

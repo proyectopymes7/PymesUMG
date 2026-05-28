@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../services/api'
+import { uploadImage } from '../services/businessService'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -89,15 +90,14 @@ const saveProfile = async () => {
   if (!validate()) return
   saving.value = true
   try {
-    // 1. Subir foto si hay archivo nuevo
+    // 1. Subir foto si hay archivo nuevo (2 pasos: upload → URL → guardar con perfil)
+    let fotoUrl = undefined
     if (photoFile.value) {
       uploadingPhoto.value = true
-      const fd = new FormData()
-      fd.append('foto', photoFile.value)
       try {
-        await api.post('/auth/profile/photo', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        fotoUrl = await uploadImage(photoFile.value, 'perfiles')
+        photoPreview.value = fotoUrl
+        photoFile.value = null
       } catch (photoErr) {
         console.warn('No se pudo subir la foto:', photoErr)
         showToast('No se pudo subir la foto de perfil', 'error')
@@ -106,10 +106,11 @@ const saveProfile = async () => {
       }
     }
 
-    // 2. Guardar nombre y apellido
+    // 2. Guardar nombre, apellido y foto_perfil en una sola llamada
     const payload = {
       nombre:   form.value.nombre.trim(),
-      apellido: form.value.apellido.trim()
+      apellido: form.value.apellido.trim(),
+      ...(fotoUrl !== undefined && { foto_perfil: fotoUrl })
     }
     const res = await api.put('/auth/profile', payload)
     const updatedUser = res.data?.data || { ...authStore.user, ...payload }
@@ -120,7 +121,7 @@ const saveProfile = async () => {
       ...updatedUser,
       nombre:      form.value.nombre.trim(),
       apellido:    form.value.apellido.trim(),
-      foto_perfil: photoPreview.value
+      foto_perfil: updatedUser.foto_perfil ?? photoPreview.value
     }
     localStorage.setItem('user', JSON.stringify(authStore.user))
 
