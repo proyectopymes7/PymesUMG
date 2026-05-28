@@ -27,6 +27,28 @@ const submitting = ref(false)
 const categories = ref([])
 const selectedCategorias = ref([])
 
+// ── Foto del negocio (opcional) ─────────────────────────
+const businessImageFile = ref(null)
+const businessImagePreview = ref(null)
+const businessImageInputRef = ref(null)
+
+const handleBusinessImageChange = (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('La imagen no debe superar 5MB', 'error')
+    return
+  }
+  businessImageFile.value = file
+  businessImagePreview.value = URL.createObjectURL(file)
+}
+
+const clearBusinessImage = () => {
+  businessImageFile.value = null
+  businessImagePreview.value = null
+  if (businessImageInputRef.value) businessImageInputRef.value.value = ''
+}
+
 const form = ref({
   nombre: '',
   descripcion: '',
@@ -179,7 +201,6 @@ const submitRequest = async () => {
 
   submitting.value = true
   try {
-    // Construir horario
     const diasStr = selectedDays.value.join(', ')
     const horarioStr = selectedDays.value.length > 0
       ? `${diasStr} ${openTime.value} - ${closeTime.value}`
@@ -188,10 +209,10 @@ const submitRequest = async () => {
     const loc = form.value.locationData || {}
 
     const payload = {
-      nombre:      form.value.nombre.trim(),
-      descripcion: form.value.descripcion.trim(),
-      id_categoria: selectedCategorias.value[0], // primary category
-      estado:      'pendiente'
+      nombre:       form.value.nombre.trim(),
+      descripcion:  form.value.descripcion.trim(),
+      id_categoria: selectedCategorias.value[0],
+      estado:       'pendiente'
     }
 
     if (horarioStr)           payload.horario      = horarioStr
@@ -207,7 +228,20 @@ const submitRequest = async () => {
     const res = await api.post('/emprendimientos', payload)
     const newId = res.data?.data?.id_emprendimiento
 
-    // 2. Subir productos si hay
+    // 2. Subir foto del negocio si hay
+    if (newId && businessImageFile.value) {
+      try {
+        const fd = new FormData()
+        fd.append('imagen', businessImageFile.value)
+        await api.post(`/imagenes/emprendimiento/${newId}`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        })
+      } catch (imgErr) {
+        console.warn('No se pudo subir la foto del negocio:', imgErr)
+      }
+    }
+
+    // 3. Subir productos si hay
     if (newId && products.value.length > 0) {
       for (const prod of products.value) {
         try {
@@ -301,6 +335,47 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 
       <!-- ═══ STEP 1: Información general ═══ -->
       <div v-if="currentStep === 1" class="space-y-5">
+
+        <!-- Foto del negocio (opcional) -->
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Foto del Negocio</p>
+            <span class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Opcional</span>
+          </div>
+
+          <input ref="businessImageInputRef" type="file" accept="image/*" class="hidden" @change="handleBusinessImageChange" />
+
+          <!-- Preview -->
+          <div v-if="businessImagePreview" class="relative w-full h-48 rounded-2xl overflow-hidden border border-slate-200 group">
+            <img :src="businessImagePreview" class="w-full h-full object-cover" alt="Foto del negocio" />
+            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+              <button @click="businessImageInputRef?.click()" class="bg-white/20 hover:bg-white/40 text-white px-4 py-2 rounded-xl text-xs font-bold backdrop-blur-sm">
+                Cambiar foto
+              </button>
+              <button @click="clearBusinessImage" class="bg-red-500/80 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-bold backdrop-blur-sm">
+                Quitar
+              </button>
+            </div>
+            <!-- Badge esquina -->
+            <div class="absolute top-3 left-3 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full">
+              Foto seleccionada
+            </div>
+          </div>
+
+          <!-- Drop zone -->
+          <div v-else
+            @click="businessImageInputRef?.click()"
+            class="w-full h-48 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-100 transition-all group">
+            <div class="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mb-3 shadow-sm group-hover:border-fiery-navy transition-colors">
+              <svg class="w-7 h-7 text-slate-300 group-hover:text-fiery-navy transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+            </div>
+            <p class="text-sm font-bold text-slate-400 group-hover:text-fiery-navy transition-colors">Subir foto del negocio</p>
+            <p class="text-xs text-slate-300 mt-1">JPG, PNG o WEBP · Máx. 5MB</p>
+          </div>
+        </div>
+
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-5">
           <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Información General</p>
 
@@ -521,6 +596,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         <div class="bg-fiery-navy/5 border border-fiery-navy/10 rounded-3xl p-6 space-y-2">
           <p class="text-[10px] font-black uppercase tracking-widest text-fiery-navy mb-3">Resumen de tu solicitud</p>
           <p class="text-sm text-slate-600"><span class="font-bold text-fiery-navy">Negocio:</span> {{ form.nombre }}</p>
+          <p class="text-sm text-slate-600"><span class="font-bold text-fiery-navy">Foto:</span>
+            {{ businessImageFile ? '✓ Imagen seleccionada' : 'Sin foto (puedes agregarla después)' }}
+          </p>
           <p class="text-sm text-slate-600"><span class="font-bold text-fiery-navy">Categorías:</span>
             {{ categories.filter(c => selectedCategorias.includes(c.id_categoria)).map(c => c.nombre).join(', ') || '—' }}
           </p>
