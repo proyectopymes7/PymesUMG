@@ -232,15 +232,28 @@ const submitReview = async () => {
               Servicios
               <div class="h-1 flex-1 bg-fiery-cream rounded-full"></div>
             </h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-              <div v-for="service in services" :key="service.id_producto" class="flex justify-between items-center bg-white p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm">
-                <div class="flex items-center gap-3 md:gap-4">
-                  <div class="w-8 h-8 md:w-10 md:h-10 bg-fiery-navy/5 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 md:w-6 md:h-6 text-fiery-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
+              <div v-for="service in services" :key="service.id_producto" class="bg-white rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm group">
+                <div class="h-48 md:h-64 overflow-hidden bg-slate-100">
+                  <img
+                    v-if="service.imagen_url"
+                    :src="service.imagen_url"
+                    :alt="service.nombre"
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div v-else class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200 gap-3">
+                    <div class="w-14 h-14 bg-fiery-navy/10 rounded-2xl flex items-center justify-center">
+                      <svg class="w-8 h-8 text-fiery-navy/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    </div>
                   </div>
-                  <span class="font-bold text-fiery-navy text-base md:text-lg">{{ service.nombre }}</span>
                 </div>
-                <span class="font-black text-fiery-red text-sm whitespace-nowrap ml-3">{{ formatPrice(service) }}</span>
+                <div class="p-6 md:p-8">
+                  <div class="flex justify-between items-center gap-2">
+                    <h3 class="text-xl md:text-2xl font-bold text-fiery-navy leading-tight">{{ service.nombre }}</h3>
+                    <span class="text-xl md:text-2xl font-black text-fiery-red whitespace-nowrap">{{ formatPrice(service) }}</span>
+                  </div>
+                  <p v-if="service.descripcion" class="text-slate-500 text-sm mt-2 line-clamp-2">{{ service.descripcion }}</p>
+                </div>
               </div>
             </div>
           </div>

@@ -6,12 +6,14 @@ class Emprendimiento {
       INSERT INTO Emprendimientos (
         id_usuario, id_categoria, nombre, descripcion, telefono, whatsapp,
         latitud, longitud, horario, vistas, destacado, estado,
-        departamento, municipio, localidad, direccion, fecha_registro
+        departamento, municipio, localidad, direccion,
+        instagram, facebook, website, fecha_registro
       )
       VALUES (
         @id_usuario, @id_categoria, @nombre, @descripcion, @telefono, @whatsapp,
         @latitud, @longitud, @horario, @vistas, @destacado, @estado,
-        @departamento, @municipio, @localidad, @direccion, GETDATE()
+        @departamento, @municipio, @localidad, @direccion,
+        @instagram, @facebook, @website, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as id_emprendimiento;
     `;
@@ -33,6 +35,9 @@ class Emprendimiento {
       { name: 'municipio',    value: emprendimientoData.municipio || null,              type: sql.NVarChar },
       { name: 'localidad',    value: emprendimientoData.localidad || null,              type: sql.NVarChar },
       { name: 'direccion',    value: emprendimientoData.direccion || null,              type: sql.NVarChar },
+      { name: 'instagram',   value: emprendimientoData.instagram || null,              type: sql.NVarChar },
+      { name: 'facebook',    value: emprendimientoData.facebook || null,               type: sql.NVarChar },
+      { name: 'website',     value: emprendimientoData.website || null,                type: sql.NVarChar },
     ];
 
     try {
@@ -271,6 +276,16 @@ class Emprendimiento {
     
     const params = [{ name: 'id_emprendimiento', value: id, type: sql.Int }];
     
+    try {
+      await executeQuery(query, params);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async delete(id) {
+    const query = `DELETE FROM Emprendimientos WHERE id_emprendimiento = @id_emprendimiento;`;
+    const params = [{ name: 'id_emprendimiento', value: id, type: sql.Int }];
     try {
       await executeQuery(query, params);
     } catch (error) {

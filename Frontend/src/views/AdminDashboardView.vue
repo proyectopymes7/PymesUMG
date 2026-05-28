@@ -1,7 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import Navbar from '../components/layout/Navbar.vue'
-import { getAllBusinesses, getPendingBusinesses, updateBusinessStatus, getAllUsers, updateUserRole } from '../services/businessService'
+import { getAllBusinesses, getPendingBusinesses, updateBusinessStatus, getAllUsers, updateUserRole, deleteBusinessById } from '../services/businessService'
+import { useAuthStore } from '../stores/auth'
 
 // Import Modals
 import EditBusinessModal from '../components/admin/EditBusinessModal.vue'
@@ -38,7 +39,11 @@ const countInactivos = computed(() => allBusinesses.value.filter(b => !isActive(
 const showBusinessModal = ref(false)
 const selectedBusiness = ref(null)
 
-const updatingBusinessId = ref(null) // for toggle switch spinner
+const updatingBusinessId = ref(null)
+const deleteConfirmId    = ref(null)
+const deletingId         = ref(null)
+
+const authStore = useAuthStore()
 
 // Computed variable to check for authentication token
 const hasToken = computed(() => !!localStorage.getItem('token'))
@@ -121,6 +126,23 @@ const toggleBusinessStatus = async (business) => {
     showToast(errorMsg, 'error')
   } finally {
     updatingBusinessId.value = null
+  }
+}
+
+const confirmDeleteBusiness = (id) => { deleteConfirmId.value = id }
+const cancelDelete = () => { deleteConfirmId.value = null }
+
+const deleteBusinessFromAdmin = async (id) => {
+  deletingId.value = id
+  try {
+    await deleteBusinessById(id)
+    allBusinesses.value = allBusinesses.value.filter(b => b.id !== id)
+    deleteConfirmId.value = null
+    showToast('Negocio eliminado permanentemente')
+  } catch (e) {
+    showToast(e.response?.data?.message || 'Error al eliminar', 'error')
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -335,7 +357,52 @@ onMounted(fetchData)
             >Inactivos <span class="opacity-60">({{ countInactivos }})</span></button>
           </div>
 
-          <div class="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+          <!-- Mobile cards -->
+          <div class="md:hidden space-y-3">
+            <div v-for="business in filteredBusinesses" :key="business.id" class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+                  <img :src="business.image" loading="lazy" class="w-full h-full object-cover" />
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold text-fiery-navy uppercase tracking-tighter truncate">{{ business.name }}</p>
+                  <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">{{ business.category }}</p>
+                </div>
+                <button @click="toggleBusinessStatus(business)" :disabled="updatingBusinessId === business.id"
+                  :class="['relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none', (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'bg-emerald-500' : 'bg-red-400']">
+                  <span :class="['pointer-events-none relative inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition-transform duration-300', (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'translate-x-5' : 'translate-x-0']">
+                    <svg v-if="updatingBusinessId === business.id" class="animate-spin h-4 w-4 text-emerald-500 absolute top-1 left-1" fill="none" viewBox="0 0 24 24">
+                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+              <div v-if="deleteConfirmId === business.id" class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                <span class="text-xs font-black text-red-600 flex-1">¿Eliminar permanentemente?</span>
+                <button @click="cancelDelete" class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 bg-slate-100">No</button>
+                <button @click="deleteBusinessFromAdmin(business.id)" :disabled="deletingId === business.id"
+                  class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-white bg-red-600 disabled:opacity-60 flex items-center gap-1.5">
+                  <div v-if="deletingId === business.id" class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Sí
+                </button>
+              </div>
+              <div v-else class="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                <button @click="openBusinessEdit(business)"
+                  class="flex-1 flex items-center justify-center gap-1.5 bg-fiery-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-80">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                  Editar
+                </button>
+                <button v-if="authStore.isSuperAdmin" @click="confirmDeleteBusiness(business.id)"
+                  class="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 border border-red-100">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Desktop table -->
+          <div class="hidden md:block bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <div class="overflow-x-auto w-full">
             <table class="w-full text-left border-collapse" style="min-width: 580px">
               <thead>
@@ -351,44 +418,61 @@ onMounted(fetchData)
                   <td class="px-6 md:px-8 py-5">
                     <div class="flex items-center gap-4">
                       <div class="w-10 h-10 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                        <img :src="business.image" class="w-full h-full object-cover" />
+                        <img :src="business.image" loading="lazy" class="w-full h-full object-cover" />
                       </div>
                       <span class="text-sm font-bold text-fiery-navy uppercase tracking-tighter">{{ business.name }}</span>
                     </div>
                   </td>
                   <td class="px-6 md:px-8 py-5 text-sm text-slate-500 font-bold uppercase text-[10px]">{{ business.category }}</td>
-                  
+
                   <td class="px-6 md:px-8 py-5 text-center">
                     <div class="flex items-center justify-center">
-                      <button 
-                        @click="toggleBusinessStatus(business)" 
+                      <button
+                        @click="toggleBusinessStatus(business)"
                         :disabled="updatingBusinessId === business.id"
-                        :title="(business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'Negocio Activo. Clic para desactivar.' : 'Negocio Inactivo. Clic para activar.'"
                         :class="[
-                          'relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-fiery-red focus-visible:ring-opacity-75',
+                          'relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none',
                           (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'bg-emerald-500' : 'bg-red-400'
                         ]"
                       >
-                        <span 
-                          :class="[
-                            'pointer-events-none relative inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition-transform duration-300 ease-in-out',
-                            (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'translate-x-5' : 'translate-x-0'
-                          ]"
-                        >
-                          <svg v-if="updatingBusinessId === business.id" class="animate-spin h-4 w-4 text-emerald-500 absolute top-1 left-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <span :class="[
+                          'pointer-events-none relative inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition-transform duration-300 ease-in-out',
+                          (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'translate-x-5' : 'translate-x-0'
+                        ]">
+                          <svg v-if="updatingBusinessId === business.id" class="animate-spin h-4 w-4 text-emerald-500 absolute top-1 left-1" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                           </svg>
                         </span>
                       </button>
                     </div>
                   </td>
 
+                  <!-- Acciones -->
                   <td class="px-6 md:px-8 py-5 text-right">
-                    <button @click="openBusinessEdit(business)" class="inline-flex items-center gap-1.5 bg-fiery-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                      Editar
-                    </button>
+                    <!-- Confirmación eliminar (inline) -->
+                    <div v-if="deleteConfirmId === business.id" class="flex items-center justify-end gap-2">
+                      <span class="text-xs font-black text-red-600">¿Eliminar permanentemente?</span>
+                      <button @click="cancelDelete" class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">No</button>
+                      <button @click="deleteBusinessFromAdmin(business.id)" :disabled="deletingId === business.id"
+                        class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-60 flex items-center gap-1.5">
+                        <div v-if="deletingId === business.id" class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Sí, eliminar
+                      </button>
+                    </div>
+                    <!-- Botones normales -->
+                    <div v-else class="flex items-center justify-end gap-2">
+                      <button @click="openBusinessEdit(business)"
+                        class="inline-flex items-center gap-1.5 bg-fiery-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                        Editar
+                      </button>
+                      <button v-if="authStore.isSuperAdmin" @click="confirmDeleteBusiness(business.id)"
+                        class="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors border border-red-100"
+                        title="Eliminar negocio">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -398,7 +482,48 @@ onMounted(fetchData)
         </div>
 
         <!-- Users Tab (Super Admin Only) -->
-        <div v-if="activeTab === 'users'" class="bg-white rounded-2xl md:rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
+        <div v-if="activeTab === 'users'">
+
+          <!-- Mobile cards -->
+          <div class="md:hidden space-y-3">
+            <div v-for="user in allUsers" :key="user.id_usuario" class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
+              <div class="flex items-center gap-3">
+                <label :for="`photo-mob-${user.id_usuario}`" class="relative w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-slate-100 cursor-pointer group">
+                  <img v-if="user.foto_perfil" :src="user.foto_perfil" class="w-full h-full object-cover" />
+                  <div v-else class="w-full h-full bg-fiery-navy flex items-center justify-center text-white font-black text-sm uppercase">{{ user.nombre?.[0] || '?' }}</div>
+                  <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div v-if="uploadingPhotoUserId === user.id_usuario" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <svg v-else class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                  </div>
+                  <input :id="`photo-mob-${user.id_usuario}`" type="file" accept="image/*" class="hidden" @change="handleAdminPhotoChange(user.id_usuario, $event)" />
+                </label>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold text-fiery-navy uppercase tracking-tighter truncate">{{ user.nombre }} {{ user.apellido }}</p>
+                  <p class="text-[10px] text-slate-400 truncate">{{ user.correo }}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 mt-3 pt-3 border-t border-slate-100">
+                <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest shrink-0" :class="roleBadge(user.id_rol).color">{{ roleBadge(user.id_rol).label }}</span>
+                <div class="relative ml-auto">
+                  <select :value="user.id_rol" :disabled="updatingRoleId === user.id_usuario"
+                    @change="changeUserRole(user.id_usuario, $event.target.value)"
+                    class="appearance-none pl-3 pr-8 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:border-fiery-navy disabled:opacity-50">
+                    <option v-for="role in ROLES" :key="role.id" :value="role.id">{{ role.label }}</option>
+                  </select>
+                  <div class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
+                    <div v-if="updatingRoleId === user.id_usuario" class="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                    <svg v-else class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Desktop table -->
+          <div class="hidden md:block bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <div class="overflow-x-auto w-full">
             <table class="w-full text-left border-collapse" style="min-width: 480px">
               <thead>
@@ -467,6 +592,7 @@ onMounted(fetchData)
                 </tr>
               </tbody>
             </table>
+          </div>
           </div>
         </div>
       </div>

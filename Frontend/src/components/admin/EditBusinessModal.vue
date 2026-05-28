@@ -205,6 +205,8 @@ const saveGeneral = async () => {
     payload.categorias = selectedCategorias.value
     if (formData.value.horario)          payload.horario     = formData.value.horario
     if (formData.value.socials?.whatsapp) payload.whatsapp   = formData.value.socials.whatsapp
+    payload.facebook  = formData.value.socials?.facebook  || ''
+    payload.instagram = formData.value.socials?.instagram || ''
     if (loc.departamento) payload.departamento = loc.departamento
     if (loc.municipio)    payload.municipio    = loc.municipio
     if (loc.localidad)    payload.localidad    = loc.localidad
@@ -219,7 +221,12 @@ const saveGeneral = async () => {
       name:         payload.nombre        ?? props.business.name,
       description:  payload.descripcion   ?? props.business.description,
       horario:      payload.horario       ?? props.business.horario,
-      socials: { ...props.business.socials, whatsapp: payload.whatsapp ?? props.business.socials?.whatsapp },
+      socials: {
+        ...props.business.socials,
+        whatsapp:  payload.whatsapp  ?? props.business.socials?.whatsapp,
+        facebook:  payload.facebook  ?? props.business.socials?.facebook,
+        instagram: payload.instagram ?? props.business.socials?.instagram
+      },
       lat:          payload.latitud       ?? props.business.lat,
       lng:          payload.longitud      ?? props.business.lng,
       departamento: payload.departamento  ?? props.business.departamento,
@@ -260,7 +267,7 @@ const openEditProduct = (prod) => {
     descripcion: prod.descripcion 
   }
   productImageFile.value = null
-  productImagePreview.value = prod.imagen || null
+  productImagePreview.value = prod.imagen_url || null
   showProductForm.value = true
 }
 

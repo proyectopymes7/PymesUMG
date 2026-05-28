@@ -7,7 +7,7 @@ const {
   getEmprendimientos,
   getEmprendimientoById,
   updateEmprendimiento,
-  // deleteEmprendimiento, // Soft delete will be implemented later
+  deleteEmprendimiento,
   searchEmprendimientos,
   getMyEmprendimientos,
   validateCreateEmprendimiento,
@@ -23,9 +23,6 @@ router.get('/:id', optionalAuth, getEmprendimientoById);
 router.post('/', auth, validateCreateEmprendimiento, createEmprendimiento);
 router.get('/my/emprendimientos', auth, getMyEmprendimientos);
 router.put('/:id', auth, validateUpdateEmprendimiento, updateEmprendimiento);
-// router.delete('/:id', auth, deleteEmprendimiento); // Soft delete will be implemented later
-
-// Admin only routes
-// router.delete('/:id/admin', auth, authorize('admin'), deleteEmprendimiento); // Soft delete will be implemented later
+router.delete('/:id', auth, authorize('superadministrador'), deleteEmprendimiento);
 
 module.exports = router;

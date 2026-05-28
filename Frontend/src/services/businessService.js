@@ -35,9 +35,9 @@ const mapBusinessData = (b) => {
     hours: [{ day: 'Lunes - Domingo', time: b.horario || '8:00 AM - 5:00 PM' }],
     socials: {
       whatsapp: b.whatsapp ? `https://wa.me/${b.whatsapp}` : '',
-      instagram: '',
-      facebook: '',
-      website: ''
+      instagram: b.instagram || '',
+      facebook: b.facebook || '',
+      website: b.website || ''
     },
     products: [],
     services: [],
@@ -246,17 +246,61 @@ export const getBusinessReviews = async (businessId) => {
   }
 };
 
-// Generic two-step upload: sends file to /imagenes/upload, returns the URL.
+// Comprime una imagen en el cliente antes de subirla.
+// Convierte a JPEG para garantizar compresión. maxWidth en px, quality 0-1.
+const compressImage = (file, maxWidth, quality) => new Promise((resolve) => {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    let { width, height } = img;
+    if (width > maxWidth) {
+      height = Math.round(height * maxWidth / width);
+      width = maxWidth;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    canvas.toBlob(
+      blob => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })),
+      'image/jpeg',
+      quality
+    );
+  };
+  img.src = url;
+});
+
+// Sube imagen con compresión automática según el tipo.
 // tipo: 'logos' | 'imagenes' | 'perfiles'
 export const uploadImage = async (file, tipo = 'imagenes') => {
+  const limits = { logos: [600, 0.85], perfiles: [400, 0.85], imagenes: [1200, 0.80] };
+  const [maxW, quality] = limits[tipo] ?? [1200, 0.80];
+  const compressed = await compressImage(file, maxW, quality);
+
   const fd = new FormData();
-  fd.append('imagen', file);
+  fd.append('imagen', compressed);
   fd.append('tipo', tipo);
   const response = await api.post('/imagenes/upload', fd, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
   if (!response.data?.url) throw new Error('No se recibió URL de la imagen');
   return response.data.url;
+};
+
+export const uploadProductImage = async (file, productId) => {
+  const compressed = await compressImage(file, 800, 0.80);
+  const fd = new FormData();
+  fd.append('imagen', compressed);
+  const response = await api.post(`/imagenes/producto/${productId}`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  if (!response.data?.url) throw new Error('No se recibió URL de la imagen del producto');
+  return response.data.url;
+};
+
+export const deleteBusinessById = async (id) => {
+  await api.delete(`/emprendimientos/${id}`);
 };
 
 export const createReview = async ({ id_emprendimiento, comentario, calificacion }) => {

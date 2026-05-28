@@ -177,6 +177,22 @@ app.listen(PORT, async () => {
     logger.error('Failed to add foto_perfil column:', err.message);
   }
 
+  // Add social media columns to Emprendimientos if they don't exist
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Emprendimientos') AND name = 'instagram')
+        ALTER TABLE Emprendimientos ADD instagram NVARCHAR(200) NULL;
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Emprendimientos') AND name = 'facebook')
+        ALTER TABLE Emprendimientos ADD facebook NVARCHAR(200) NULL;
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Emprendimientos') AND name = 'website')
+        ALTER TABLE Emprendimientos ADD website NVARCHAR(200) NULL;
+    `);
+    logger.info('Social media columns ready');
+  } catch (err) {
+    logger.error('Failed to add social columns:', err.message);
+  }
+
   // Drop any CHECK constraint on estado so ACTIVO/INACTIVO are accepted
   try {
     const pool = await connectDB();

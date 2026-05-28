@@ -217,6 +217,8 @@ const submitRequest = async () => {
 
     if (horarioStr)           payload.horario      = horarioStr
     if (form.value.whatsapp)  payload.whatsapp     = form.value.whatsapp.trim()
+    payload.facebook  = (form.value.facebook  || '').trim()
+    payload.instagram = (form.value.instagram || '').trim()
     if (loc.departamento)     payload.departamento = loc.departamento
     if (loc.municipio)        payload.municipio    = loc.municipio
     if (loc.localidad)        payload.localidad    = loc.localidad

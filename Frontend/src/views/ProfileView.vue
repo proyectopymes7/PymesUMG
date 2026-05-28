@@ -22,6 +22,7 @@ const saving = ref(false)
 const uploadingPhoto = ref(false)
 const photoPreview = ref(null)
 const photoFile = ref(null)
+const photoDeleted = ref(false)
 const fileInputRef = ref(null)
 
 const form = ref({
@@ -76,12 +77,14 @@ const handlePhotoChange = (e) => {
     return
   }
   photoFile.value = file
+  photoDeleted.value = false
   photoPreview.value = URL.createObjectURL(file)
 }
 
 const clearPhoto = () => {
   photoFile.value = null
   photoPreview.value = null
+  photoDeleted.value = true
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
@@ -110,19 +113,25 @@ const saveProfile = async () => {
     const payload = {
       nombre:   form.value.nombre.trim(),
       apellido: form.value.apellido.trim(),
-      ...(fotoUrl !== undefined && { foto_perfil: fotoUrl })
+      ...(fotoUrl !== undefined
+        ? { foto_perfil: fotoUrl }
+        : photoDeleted.value
+          ? { foto_perfil: '' }
+          : {})
     }
     const res = await api.put('/auth/profile', payload)
     const updatedUser = res.data?.data || { ...authStore.user, ...payload }
 
     // 3. Actualizar store
+    const finalPhoto = fotoUrl ?? (photoDeleted.value ? '' : (updatedUser.foto_perfil ?? photoPreview.value))
     authStore.user = {
       ...authStore.user,
       ...updatedUser,
       nombre:      form.value.nombre.trim(),
       apellido:    form.value.apellido.trim(),
-      foto_perfil: updatedUser.foto_perfil ?? photoPreview.value
+      foto_perfil: finalPhoto
     }
+    photoDeleted.value = false
     localStorage.setItem('user', JSON.stringify(authStore.user))
 
     showToast('Perfil actualizado correctamente')
