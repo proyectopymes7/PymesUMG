@@ -65,6 +65,7 @@ class User {
     const query = `
       SELECT u.id_usuario, u.nombre, u.apellido, u.correo, u.activo, u.id_rol,
              u.fecha_registro, u.intentos_fallidos, u.bloqueado_hasta,
+             u.foto_perfil,
              r.nombre as rol_nombre
       FROM Usuarios u
       LEFT JOIN Roles r ON u.id_rol = r.id_rol

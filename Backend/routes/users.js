@@ -56,11 +56,12 @@ router.get('/:id', auth, authorize('admin'), async (req, res) => {
 
 router.put('/:id', auth, authorize('admin'), async (req, res) => {
   try {
-    const { nombre, apellido, telefono } = req.body;
+    const { nombre, apellido, telefono, foto_perfil } = req.body;
     const updateData = {};
-    if (nombre   !== undefined) updateData.nombre   = nombre;
-    if (apellido !== undefined) updateData.apellido = apellido;
-    if (telefono !== undefined) updateData.telefono = telefono;
+    if (nombre      !== undefined) updateData.nombre      = nombre;
+    if (apellido    !== undefined) updateData.apellido    = apellido;
+    if (telefono    !== undefined) updateData.telefono    = telefono;
+    if (foto_perfil !== undefined) updateData.foto_perfil = foto_perfil;
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No fields to update' });

@@ -5,7 +5,6 @@ import { getAllBusinesses, getPendingBusinesses, updateBusinessStatus, getAllUse
 
 // Import Modals
 import EditBusinessModal from '../components/admin/EditBusinessModal.vue'
-import EditUserModal from '../components/admin/EditUserModal.vue'
 
 // Local Toast System
 const toasts = ref([])
@@ -38,8 +37,6 @@ const countInactivos = computed(() => allBusinesses.value.filter(b => !isActive(
 // Modals State
 const showBusinessModal = ref(false)
 const selectedBusiness = ref(null)
-const showUserModal = ref(false)
-const selectedUser = ref(null)
 
 const updatingBusinessId = ref(null) // for toggle switch spinner
 
@@ -142,34 +139,66 @@ const handleBusinessSaved = (updatedBusiness) => {
   showToast('Negocio actualizado correctamente')
 }
 
+const updatingRoleId = ref(null)
+
+const ROLES = [
+  { id: 1, label: 'Superadmin',   color: 'bg-purple-100 text-purple-700' },
+  { id: 2, label: 'Administrador', color: 'bg-indigo-100 text-indigo-600' },
+  { id: 3, label: 'Emprendedor',  color: 'bg-emerald-100 text-emerald-700' },
+  { id: 4, label: 'Visitante',    color: 'bg-slate-100 text-slate-500' },
+]
+const roleBadge = (id) => ROLES.find(r => r.id === id) ?? ROLES[3]
+
 const changeUserRole = async (userId, newRoleId) => {
   if (!hasToken.value) {
     showToast('Debes iniciar sesión para realizar esta acción', 'error')
     return
   }
+  newRoleId = parseInt(newRoleId)
+  const user = allUsers.value.find(u => u.id_usuario === userId)
+  const prevRole = user?.id_rol
+  if (user) user.id_rol = newRoleId   // optimistic update
+  updatingRoleId.value = userId
   try {
     await updateUserRole(userId, newRoleId)
-    await fetchData()
-    showToast('Rol de usuario actualizado')
+    showToast('Rol actualizado')
   } catch (error) {
-    console.error(error)
-    const errorMsg = error.response?.data?.message || 'Error al cambiar el rol'
-    showToast(errorMsg, 'error')
+    if (user) user.id_rol = prevRole  // revert
+    showToast(error.response?.data?.message || 'Error al cambiar el rol', 'error')
+  } finally {
+    updatingRoleId.value = null
   }
 }
 
-const openUserEdit = (user) => {
-  selectedUser.value = user
-  showUserModal.value = true
+// Expandir solicitudes
+const expandedRequestId = ref(null)
+const toggleExpand = (id) => {
+  expandedRequestId.value = expandedRequestId.value === id ? null : id
 }
 
-const handleUserSaved = (updatedUser) => {
-  // Update local list without full fetch for a smoother experience
-  const index = allUsers.value.findIndex(u => u.id_usuario === updatedUser.id_usuario)
-  if (index !== -1) {
-    allUsers.value[index] = { ...allUsers.value[index], ...updatedUser }
+// Cambiar foto de usuario desde el panel admin
+import { uploadImage } from '../services/businessService'
+const uploadingPhotoUserId = ref(null)
+
+const handleAdminPhotoChange = async (userId, event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) { showToast('La imagen no debe superar 5MB', 'error'); return }
+  uploadingPhotoUserId.value = userId
+  try {
+    const url = await uploadImage(file, 'perfiles')
+    await import('../services/api').then(m => m.default.put(`/users/${userId}`, { foto_perfil: url }))
+    const user = allUsers.value.find(u => u.id_usuario === userId)
+    if (user) user.foto_perfil = url
+    showToast('Foto actualizada')
+  } catch (e) {
+    showToast(e.response?.data?.message || 'Error al subir la foto', 'error')
+  } finally {
+    uploadingPhotoUserId.value = null
+    event.target.value = ''
   }
 }
+
 
 onMounted(fetchData)
 </script>
@@ -208,23 +237,83 @@ onMounted(fetchData)
           <div v-if="pendingRequests.length === 0" class="bg-white rounded-[2rem] p-12 text-center border-2 border-dashed border-slate-200">
             <p class="text-slate-400 font-bold uppercase tracking-widest">No hay solicitudes pendientes</p>
           </div>
-          <div v-for="req in pendingRequests" :key="req.id" class="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-100 flex flex-col md:flex-row items-center gap-8 hover:shadow-xl transition-all">
-            <div class="w-full md:w-48 h-32 rounded-2xl overflow-hidden bg-slate-100">
-              <img :src="req.image" class="w-full h-full object-cover" />
-            </div>
-            <div class="flex-1 text-center md:text-left">
-              <div class="inline-block px-3 py-1 bg-amber-100 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest mb-3">Pendiente de Revisión</div>
-              <h3 class="text-xl font-black text-fiery-navy uppercase tracking-tighter mb-2">{{ req.name }}</h3>
-              <p class="text-slate-500 text-sm mb-4 line-clamp-1">{{ req.description }}</p>
-              <div class="flex flex-wrap justify-center md:justify-start gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                <span>Categoría: {{ req.category }}</span>
-                <span>Dueño ID: {{ req.id_usuario }}</span>
+          <div v-for="req in pendingRequests" :key="req.id"
+            class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl transition-all">
+
+            <!-- Fila principal -->
+            <div class="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
+              <div class="w-full md:w-40 h-28 rounded-2xl overflow-hidden bg-slate-100 flex-shrink-0">
+                <img :src="req.image" class="w-full h-full object-cover" />
+              </div>
+
+              <div class="flex-1 text-center md:text-left min-w-0">
+                <div class="inline-block px-3 py-1 bg-amber-100 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest mb-2">Pendiente de Revisión</div>
+                <h3 class="text-xl font-black text-fiery-navy uppercase tracking-tighter mb-1">{{ req.name }}</h3>
+                <p class="text-slate-500 text-sm line-clamp-1 mb-2">{{ req.description }}</p>
+                <div class="flex flex-wrap justify-center md:justify-start gap-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <span>{{ req.category }}</span>
+                  <span v-if="req.location" class="text-slate-300">·</span>
+                  <span v-if="req.location">{{ req.location }}</span>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-2 w-full md:w-auto flex-shrink-0">
+                <button @click="handleAction(req.id, 'approve')"
+                  class="bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-md shadow-emerald-500/20 transition-all text-center">
+                  Aprobar
+                </button>
+                <button @click="handleAction(req.id, 'reject')"
+                  class="bg-fiery-red hover:bg-fiery-darkred text-white px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-md shadow-fiery-red/20 transition-all text-center">
+                  Rechazar
+                </button>
+                <button @click="toggleExpand(req.id)"
+                  class="flex items-center justify-center gap-1.5 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
+                  <svg class="w-3.5 h-3.5 transition-transform" :class="expandedRequestId === req.id ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                  {{ expandedRequestId === req.id ? 'Ocultar' : 'Ver detalles' }}
+                </button>
               </div>
             </div>
-            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-              <button @click="handleAction(req.id, 'approve')" class="flex-1 md:flex-none bg-emerald-500 hover:bg-emerald-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-emerald-500/20 transition-all text-center">Aprobar</button>
-              <button @click="handleAction(req.id, 'reject')" class="flex-1 md:flex-none bg-fiery-red hover:bg-fiery-darkred text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-fiery-red/20 transition-all text-center">Rechazar</button>
-            </div>
+
+            <!-- Panel expandido -->
+            <transition name="expand">
+              <div v-if="expandedRequestId === req.id"
+                class="border-t border-slate-100 bg-slate-50 px-6 md:px-8 py-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Descripción completa</p>
+                  <p class="text-sm text-slate-600 leading-relaxed">{{ req.description || '—' }}</p>
+                </div>
+
+                <div class="space-y-3">
+                  <div v-if="req.location">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Ubicación</p>
+                    <p class="text-sm font-semibold text-slate-700">{{ req.location }}</p>
+                  </div>
+                  <div v-if="req.horario">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Horario</p>
+                    <p class="text-sm font-semibold text-slate-700">{{ req.horario }}</p>
+                  </div>
+                  <div v-if="req.socials?.whatsapp">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">WhatsApp</p>
+                    <a :href="req.socials.whatsapp" target="_blank" class="text-sm font-semibold text-emerald-600 hover:underline">{{ req.socials.whatsapp.replace('https://wa.me/', '') }}</a>
+                  </div>
+                </div>
+
+                <div class="sm:col-span-2 pt-2 border-t border-slate-200 flex items-center justify-between">
+                  <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">ID Usuario propietario: <span class="text-slate-600">{{ req.id_usuario }}</span></span>
+                  <a :href="`/negocio/${req.id}`" target="_blank"
+                    class="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-fiery-navy hover:text-fiery-red transition-colors">
+                    Ver página pública
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            </transition>
+
           </div>
         </div>
 
@@ -315,36 +404,65 @@ onMounted(fetchData)
               <thead>
                 <tr class="bg-slate-50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                   <th class="px-6 md:px-8 py-5">Usuario</th>
-                  <th class="px-6 md:px-8 py-5">Correo</th>
-                  <th class="px-6 md:px-8 py-5">Rol Actual</th>
-                  <th class="px-6 md:px-8 py-5 text-right">Acciones</th>
+                  <th class="px-6 md:px-8 py-5">Rol</th>
+                  <th class="px-6 md:px-8 py-5 text-right">Cambiar Rol</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-50">
                 <tr v-for="user in allUsers" :key="user.id_usuario" class="hover:bg-slate-50 transition-colors">
-                  <td class="px-6 md:px-8 py-5">
+                  <!-- Avatar + nombre -->
+                  <td class="px-6 md:px-8 py-4">
                     <div class="flex items-center gap-3">
-                      <div v-if="user.avatar" class="w-8 h-8 rounded-lg overflow-hidden shrink-0">
-                        <img :src="user.avatar" class="w-full h-full object-cover" />
+                      <!-- Avatar clickeable -->
+                      <label :for="`photo-${user.id_usuario}`" class="relative w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-slate-100 cursor-pointer group">
+                        <img v-if="user.foto_perfil" :src="user.foto_perfil" class="w-full h-full object-cover" />
+                        <div v-else class="w-full h-full bg-fiery-navy flex items-center justify-center text-white font-black text-sm uppercase">
+                          {{ user.nombre?.[0] || '?' }}
+                        </div>
+                        <!-- Overlay cámara -->
+                        <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div v-if="uploadingPhotoUserId === user.id_usuario" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <svg v-else class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                          </svg>
+                        </div>
+                        <input :id="`photo-${user.id_usuario}`" type="file" accept="image/*" class="hidden"
+                          @change="handleAdminPhotoChange(user.id_usuario, $event)" />
+                      </label>
+                      <div>
+                        <p class="text-sm font-bold text-fiery-navy uppercase tracking-tighter leading-none">{{ user.nombre }} {{ user.apellido }}</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">{{ user.correo }}</p>
                       </div>
-                      <div v-else class="w-8 h-8 bg-fiery-navy rounded-lg flex items-center justify-center text-white font-black text-xs uppercase shrink-0">{{ user.nombre?.[0] || '?' }}</div>
-                      <span class="text-sm font-bold text-fiery-navy uppercase tracking-tighter">{{ user.nombre }} {{ user.apellido }}</span>
                     </div>
                   </td>
-                  <td class="px-6 md:px-8 py-5 text-sm text-slate-500">{{ user.correo }}</td>
-                  <td class="px-6 md:px-8 py-5">
-                    <span :class="[user.id_rol === 1 ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500', 'px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest']">
-                      {{ user.id_rol === 1 ? 'Administrador' : 'Usuario' }}
+
+                  <!-- Rol actual badge -->
+                  <td class="px-6 md:px-8 py-4">
+                    <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest" :class="roleBadge(user.id_rol).color">
+                      {{ roleBadge(user.id_rol).label }}
                     </span>
                   </td>
-                  <td class="px-6 md:px-8 py-5 text-right flex gap-3 justify-end items-center">
-                    <button v-if="user.id_rol === 2" @click="changeUserRole(user.id_usuario, 1)" class="text-[10px] font-black text-indigo-600 hover:text-indigo-800 uppercase tracking-widest">Hacer Admin</button>
-                    <button v-else @click="changeUserRole(user.id_usuario, 2)" class="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest">Quitar Admin</button>
-                    
-                    <button @click="openUserEdit(user)" class="inline-flex items-center gap-1.5 text-[10px] font-black text-slate-400 hover:text-fiery-navy bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg uppercase tracking-widest transition-colors ml-2">
-                      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                      Editar
-                    </button>
+
+                  <!-- Selector de rol -->
+                  <td class="px-6 md:px-8 py-4 text-right">
+                    <div class="flex items-center justify-end gap-3">
+                      <div class="relative">
+                        <select
+                          :value="user.id_rol"
+                          :disabled="updatingRoleId === user.id_usuario"
+                          @change="changeUserRole(user.id_usuario, $event.target.value)"
+                          class="appearance-none pl-3 pr-8 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:border-fiery-navy hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          <option v-for="role in ROLES" :key="role.id" :value="role.id">{{ role.label }}</option>
+                        </select>
+                        <div class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
+                          <div v-if="updatingRoleId === user.id_usuario" class="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                          <svg v-else class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -362,12 +480,6 @@ onMounted(fetchData)
       @saved="handleBusinessSaved"
     />
 
-    <EditUserModal 
-      :show="showUserModal" 
-      :user="selectedUser" 
-      @close="showUserModal = false"
-      @saved="handleUserSaved"
-    />
 
     <!-- Local Toast Container -->
     <div class="fixed bottom-6 right-6 z-[200] flex flex-col gap-3 pointer-events-none">
@@ -403,13 +515,11 @@ onMounted(fetchData)
   background-color: #e2e8f0;
   border-radius: 10px;
 }
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateX(30px) scale(0.95);
-}
+.toast-enter-active, .toast-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(30px) scale(0.95); }
+
+/* Expand solicitud */
+.expand-enter-active { transition: all 0.2s ease-out; }
+.expand-leave-active { transition: all 0.15s ease-in; }
+.expand-enter-from, .expand-leave-to { opacity: 0; transform: translateY(-8px); }
 </style>

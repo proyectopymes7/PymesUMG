@@ -1,10 +1,10 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import { useAuthStore } from '../stores/auth'
-import { getMyBusinesses, getRawCategories, updateBusinessData, getBusinessProducts, uploadImage } from '../services/businessService'
+import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage } from '../services/businessService'
 import api from '../services/api'
 
 const router = useRouter()
@@ -77,6 +77,44 @@ const selectBusiness = (b) => {
   selectedDays.value = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
   activeTab.value = 'general'
   products.value = []
+}
+
+// ── Selector dropdown ──────────────────────────────────
+const selectorOpen = ref(false)
+const selectorRef  = ref(null)
+
+const closeSelectorOnOutside = (e) => {
+  if (selectorRef.value && !selectorRef.value.contains(e.target)) {
+    selectorOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('mousedown', closeSelectorOnOutside))
+onBeforeUnmount(() => document.removeEventListener('mousedown', closeSelectorOnOutside))
+
+const pickBusiness = (b) => {
+  selectBusiness(b)
+  selectorOpen.value = false
+}
+
+// ── Desactivar negocio ─────────────────────────────────
+const deactivateConfirm = ref(false)
+const deactivating      = ref(false)
+
+const deactivateBusiness = async () => {
+  if (!business.value?.id) return
+  deactivating.value = true
+  try {
+    await updateBusinessData(business.value.id, { estado: 'inactivo' })
+    business.value = { ...business.value, estado: 'inactivo' }
+    const idx = allBusinesses.value.findIndex(b => b.id === business.value.id)
+    if (idx !== -1) allBusinesses.value[idx] = { ...allBusinesses.value[idx], estado: 'inactivo' }
+    deactivateConfirm.value = false
+    showToast('Negocio desactivado')
+  } catch (e) {
+    showToast(e.response?.data?.message || 'Error al desactivar', 'error')
+  } finally {
+    deactivating.value = false
+  }
 }
 
 // ── Form ────────────────────────────────────────────────
@@ -308,27 +346,51 @@ const saveGeneral = async () => {
     <!-- Panel principal -->
     <main v-else class="pb-20">
 
-      <!-- ── Selector de negocios ── -->
+      <!-- ── Selector de negocios (dropdown) ── -->
       <div class="pt-[88px] bg-white border-b border-slate-100">
         <div class="container mx-auto px-4 sm:px-6 max-w-3xl py-3">
-          <div class="flex items-center gap-2 overflow-x-auto trader-scroll pb-0.5">
-            <button v-for="b in allBusinesses" :key="b.id"
-              @click="selectBusiness(b)"
-              :class="['flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 border',
-                business?.id === b.id
-                  ? 'bg-fiery-navy text-white border-fiery-navy'
-                  : 'bg-white text-slate-400 border-slate-200 hover:border-fiery-navy hover:text-fiery-navy']">
-              <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="statusDot(b.estado)"></span>
-              {{ b.name }}
-            </button>
-            <button @click="router.push('/registrar-negocio')"
-              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-white text-fiery-red border border-fiery-red/40 hover:bg-fiery-red hover:text-white transition-all whitespace-nowrap flex-shrink-0">
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+
+          <div class="relative" ref="selectorRef">
+            <!-- Trigger -->
+            <button @click="selectorOpen = !selectorOpen"
+              class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:border-fiery-navy transition-all text-left">
+              <span class="w-2 h-2 rounded-full flex-shrink-0" :class="statusDot(business?.estado)"></span>
+              <span class="flex-1 text-sm font-black text-fiery-navy uppercase tracking-tight truncate">{{ business?.name }}</span>
+              <span class="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full flex-shrink-0" :class="statusBadgeClass(business?.estado)">{{ statusLabel(business?.estado) }}</span>
+              <svg class="w-4 h-4 text-slate-400 flex-shrink-0 transition-transform duration-200" :class="selectorOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
               </svg>
-              Agregar negocio
             </button>
+
+            <!-- Panel -->
+            <transition name="dropdown">
+              <div v-if="selectorOpen"
+                class="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 overflow-hidden">
+                <div class="max-h-64 overflow-y-auto">
+                  <button v-for="b in allBusinesses" :key="b.id"
+                    @click="pickBusiness(b)"
+                    class="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50 last:border-0">
+                    <span class="w-2 h-2 rounded-full flex-shrink-0" :class="statusDot(b.estado)"></span>
+                    <span class="flex-1 text-sm truncate" :class="b.id === business?.id ? 'font-black text-fiery-navy' : 'font-bold text-slate-700'">{{ b.name }}</span>
+                    <span class="text-[9px] font-black uppercase px-2 py-0.5 rounded-full flex-shrink-0" :class="statusBadgeClass(b.estado)">{{ statusLabel(b.estado) }}</span>
+                    <svg v-if="b.id === business?.id" class="w-4 h-4 text-fiery-navy flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                  </button>
+                </div>
+                <div class="border-t border-slate-100 p-2">
+                  <button @click="router.push('/registrar-negocio'); selectorOpen = false"
+                    class="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wide text-fiery-red hover:bg-red-50 transition-colors">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    Agregar negocio
+                  </button>
+                </div>
+              </div>
+            </transition>
           </div>
+
         </div>
       </div>
 
@@ -502,6 +564,21 @@ const saveGeneral = async () => {
           <div v-if="saving" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
           {{ saving ? 'Guardando...' : 'Guardar Cambios' }}
         </button>
+
+        <!-- Zona de riesgo -->
+        <div v-if="business.estado !== 'inactivo'" class="border border-red-100 rounded-3xl p-5 bg-red-50/50 space-y-3 mt-2">
+          <p class="text-[10px] font-black uppercase tracking-widest text-red-400">Zona de riesgo</p>
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p class="text-sm font-black text-slate-700">Desactivar negocio</p>
+              <p class="text-xs text-slate-500 mt-0.5">El negocio dejará de aparecer en el directorio. Podrás reactivarlo contactando al administrador.</p>
+            </div>
+            <button @click="deactivateConfirm = true"
+              class="flex-shrink-0 px-5 py-2.5 rounded-xl border-2 border-red-300 text-red-600 text-[10px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white hover:border-red-600 transition-all">
+              Desactivar
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- ═══ TAB PRODUCTOS ═══ -->
@@ -637,6 +714,45 @@ const saveGeneral = async () => {
 
       </div><!-- /container -->
     </main>
+
+    <!-- ── Modal: confirmar desactivación ── -->
+    <transition name="modal-fade">
+      <div v-if="deactivateConfirm" class="fixed inset-0 z-[400] flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" @click="deactivateConfirm = false"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl max-w-sm w-full p-7 space-y-5">
+
+          <div class="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto">
+            <svg class="w-7 h-7 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+          </div>
+
+          <div class="text-center space-y-2">
+            <h3 class="text-lg font-black text-fiery-navy uppercase tracking-tight">¿Desactivar negocio?</h3>
+            <p class="text-sm text-slate-500 leading-relaxed">
+              <span class="font-bold text-slate-700">{{ business?.name }}</span> dejará de aparecer en el directorio público de inmediato.
+            </p>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-left">
+              <p class="text-xs font-black text-amber-700 uppercase tracking-wide mb-1">Advertencia</p>
+              <p class="text-xs text-amber-600">Para reactivarlo necesitarás contactar al administrador. Los datos del negocio se conservan.</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 pt-1">
+            <button @click="deactivateConfirm = false" :disabled="deactivating"
+              class="flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50">
+              Cancelar
+            </button>
+            <button @click="deactivateBusiness" :disabled="deactivating"
+              class="flex-1 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-red-600 text-white hover:bg-red-700 transition-all shadow-lg shadow-red-200 flex items-center justify-center gap-2 disabled:opacity-60">
+              <div v-if="deactivating" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              {{ deactivating ? 'Desactivando...' : 'Sí, desactivar' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
 </template>
 
@@ -644,7 +760,20 @@ const saveGeneral = async () => {
 .font-outfit { font-family: 'Outfit', sans-serif; }
 .trader-scroll { scrollbar-width: none; }
 .trader-scroll::-webkit-scrollbar { display: none; }
+
+/* Toast */
 .toast-enter-active, .toast-leave-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .toast-enter-from { opacity: 0; transform: translateX(110%); }
 .toast-leave-to   { opacity: 0; transform: translateX(110%); }
+
+/* Dropdown */
+.dropdown-enter-active { transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
+.dropdown-leave-active { transition: all 0.1s ease-in; }
+.dropdown-enter-from  { opacity: 0; transform: translateY(-6px) scaleY(0.96); transform-origin: top; }
+.dropdown-leave-to    { opacity: 0; transform: translateY(-4px); transform-origin: top; }
+
+/* Modal */
+.modal-fade-enter-active { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+.modal-fade-leave-active { transition: all 0.15s ease-in; }
+.modal-fade-enter-from, .modal-fade-leave-to { opacity: 0; }
 </style>
