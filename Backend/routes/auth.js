@@ -9,6 +9,8 @@ const {
   getProfile,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
   validateRegister,
   validateLogin,
   validateUpdateProfile,
@@ -22,6 +24,8 @@ router.use(authRateLimiterMiddleware);
 router.post('/register', validateRegister, register);
 router.post('/login', validateLogin, login);
 router.post('/google', googleLogin);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 // Protected routes
 router.get('/profile', auth, getProfile);

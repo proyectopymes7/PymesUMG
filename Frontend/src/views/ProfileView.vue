@@ -30,6 +30,53 @@ const form = ref({
   apellido: ''
 })
 
+// ── Cambio de contraseña ────────────────────────────────
+const changingPassword = ref(false)
+const passwordForm = ref({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+const passwordErrors = ref({})
+const showCurrentPassword = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+
+const validatePassword = () => {
+  passwordErrors.value = {}
+  if (!passwordForm.value.currentPassword) {
+    passwordErrors.value.currentPassword = 'La contraseña actual es requerida'
+  }
+  if (!passwordForm.value.newPassword || passwordForm.value.newPassword.length < 8) {
+    passwordErrors.value.newPassword = 'Mínimo 8 caracteres'
+  } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(passwordForm.value.newPassword)) {
+    passwordErrors.value.newPassword = 'Debe tener mayúscula, minúscula y número'
+  }
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+    passwordErrors.value.confirmPassword = 'Las contraseñas no coinciden'
+  }
+  return Object.keys(passwordErrors.value).length === 0
+}
+
+const handleChangePassword = async () => {
+  if (!validatePassword()) return
+  changingPassword.value = true
+  try {
+    await api.put('/auth/change-password', {
+      currentPassword: passwordForm.value.currentPassword,
+      newPassword: passwordForm.value.newPassword
+    })
+    showToast('Contraseña actualizada correctamente')
+    passwordForm.value = { currentPassword: '', newPassword: '', confirmPassword: '' }
+    passwordErrors.value = {}
+  } catch (error) {
+    const msg = error.response?.data?.message || 'Error al cambiar la contraseña'
+    showToast(msg, 'error')
+  } finally {
+    changingPassword.value = false
+  }
+}
+
 // ── Errors ──────────────────────────────────────────────
 const errors = ref({})
 
@@ -258,7 +305,7 @@ const saveProfile = async () => {
           </div>
         </div>
 
-        <!-- Botones -->
+        <!-- Botones guardar perfil -->
         <div class="flex flex-col sm:flex-row gap-3">
           <button
             @click="router.back()"
@@ -271,6 +318,100 @@ const saveProfile = async () => {
           >
             <div v-if="saving" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             {{ saving ? 'Guardando...' : 'Guardar Cambios' }}
+          </button>
+        </div>
+
+        <!-- ── Cambio de Contraseña ── -->
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+          <div class="flex items-center gap-3 mb-2">
+            <div class="w-8 h-8 bg-fiery-navy/10 rounded-xl flex items-center justify-center">
+              <svg class="w-4 h-4 text-fiery-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+            </div>
+            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Cambiar Contraseña</p>
+          </div>
+
+          <!-- Contraseña actual -->
+          <div>
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Contraseña Actual</label>
+            <div class="relative">
+              <input
+                v-model="passwordForm.currentPassword"
+                :type="showCurrentPassword ? 'text' : 'password'"
+                :class="['w-full border rounded-xl px-4 py-3 text-sm font-semibold text-fiery-navy focus:outline-none focus:ring-2 transition-all pr-12', passwordErrors.currentPassword ? 'border-red-300 focus:ring-red-200' : 'border-slate-200 focus:ring-fiery-navy/20 focus:border-fiery-navy']"
+                placeholder="••••••••"
+              />
+              <button type="button" @click="showCurrentPassword = !showCurrentPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-fiery-navy transition-colors">
+                <svg v-if="showCurrentPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                </svg>
+                <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+              </button>
+            </div>
+            <p v-if="passwordErrors.currentPassword" class="text-[10px] text-red-500 font-bold mt-1">{{ passwordErrors.currentPassword }}</p>
+          </div>
+
+          <!-- Nueva contraseña -->
+          <div>
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Nueva Contraseña</label>
+            <div class="relative">
+              <input
+                v-model="passwordForm.newPassword"
+                :type="showNewPassword ? 'text' : 'password'"
+                :class="['w-full border rounded-xl px-4 py-3 text-sm font-semibold text-fiery-navy focus:outline-none focus:ring-2 transition-all pr-12', passwordErrors.newPassword ? 'border-red-300 focus:ring-red-200' : 'border-slate-200 focus:ring-fiery-navy/20 focus:border-fiery-navy']"
+                placeholder="••••••••"
+              />
+              <button type="button" @click="showNewPassword = !showNewPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-fiery-navy transition-colors">
+                <svg v-if="showNewPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                </svg>
+                <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+              </button>
+            </div>
+            <p v-if="passwordErrors.newPassword" class="text-[10px] text-red-500 font-bold mt-1">{{ passwordErrors.newPassword }}</p>
+            <p class="text-[10px] text-slate-400 mt-1">Mínimo 8 caracteres, una mayúscula, una minúscula y un número</p>
+          </div>
+
+          <!-- Confirmar contraseña -->
+          <div>
+            <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1.5">Confirmar Nueva Contraseña</label>
+            <div class="relative">
+              <input
+                v-model="passwordForm.confirmPassword"
+                :type="showConfirmPassword ? 'text' : 'password'"
+                :class="['w-full border rounded-xl px-4 py-3 text-sm font-semibold text-fiery-navy focus:outline-none focus:ring-2 transition-all pr-12', passwordErrors.confirmPassword ? 'border-red-300 focus:ring-red-200' : 'border-slate-200 focus:ring-fiery-navy/20 focus:border-fiery-navy']"
+                placeholder="••••••••"
+              />
+              <button type="button" @click="showConfirmPassword = !showConfirmPassword"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-fiery-navy transition-colors">
+                <svg v-if="showConfirmPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+                </svg>
+                <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                </svg>
+              </button>
+            </div>
+            <p v-if="passwordErrors.confirmPassword" class="text-[10px] text-red-500 font-bold mt-1">{{ passwordErrors.confirmPassword }}</p>
+          </div>
+
+          <button
+            @click="handleChangePassword"
+            :disabled="changingPassword"
+            class="w-full bg-fiery-navy hover:opacity-90 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            <div v-if="changingPassword" class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            {{ changingPassword ? 'Cambiando...' : 'Cambiar Contraseña' }}
           </button>
         </div>
 
