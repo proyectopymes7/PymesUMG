@@ -105,12 +105,10 @@ onMounted(async () => {
   window.addEventListener('resize', updateView)
   updateView()
 
-  // ── Leer parámetros que vienen del buscador del Home ──
   if (route.query.q) {
     searchKeyword.value = route.query.q
   }
   if (route.query.loc) {
-    // Buscar coincidencia normalizando para ignorar tildes/mayúsculas
     const match = Object.keys(locationsData).find(
       d => normalize(d) === normalize(route.query.loc)
     )
@@ -209,8 +207,11 @@ onMounted(async () => {
                     <svg class="w-4 h-4 shrink-0 ml-2 transition-transform" :class="categoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                   </button>
 
-                  <!-- Dropdown list -->
-                  <div v-if="categoryDropdownOpen" class="mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
+                  <!-- ✅ Dropdown list con scroll interno -->
+                  <div
+                    v-if="categoryDropdownOpen"
+                    class="mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg category-scroll"
+                  >
                     <!-- Todas -->
                     <button
                       @click="toggleCategory('Todas')"
@@ -277,7 +278,6 @@ onMounted(async () => {
           </div>
 
           <div v-else class="bg-white rounded-[3rem] p-16 text-center border border-slate-100">
-           
             <h3 class="text-3xl font-black text-fiery-navy mb-2 font-outfit uppercase">Sin resultados</h3>
             <p class="text-slate-400 mb-8 font-medium">
               No encontramos negocios
@@ -300,4 +300,24 @@ onMounted(async () => {
 .slide-fade-enter-active, .slide-fade-leave-active { transition: all 0.4s ease; }
 .slide-fade-enter-from, .slide-fade-leave-to { transform: translateX(-20px); opacity: 0; }
 select { appearance: none; }
+
+/* ✅ Dropdown de categorías con scroll interno */
+.category-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* evita que el scroll se propague a la página */
+}
+.category-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.category-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.category-scroll::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+.category-scroll::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
 </style>
