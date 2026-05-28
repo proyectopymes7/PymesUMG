@@ -7,7 +7,7 @@ const {
     getCalificacionesByEmprendimiento,
     deleteCalificacion,
     validateCreateCalificacion
-} = require('../controllers/calificacionesController');
+} = require('../controllers/calificacionController');
 
 router.get('/emprendimiento/:id_emprendimiento', optionalAuth, getCalificacionesByEmprendimiento);
 
