@@ -115,6 +115,10 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async refreshUser() {
+      return await this.checkAuth()
+    },
+
     logout() {
       this.user = null
       this.token = null

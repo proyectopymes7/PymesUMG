@@ -84,7 +84,7 @@ const handleAction = async (id, action) => {
     return
   }
   
-  const estado = action === 'approve' ? 'APROBADO' : 'rechazado'
+  const estado = action === 'approve' ? 'activo' : 'rechazado'
   try {
     await updateBusinessStatus(id, estado)
     await fetchData()

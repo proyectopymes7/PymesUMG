@@ -22,7 +22,8 @@ const register = async (req, res) => {
       });
     }
 
-    const { nombre, apellido, correo, password, id_rol = 4 } = req.body; // Default: Visitante
+    const { nombre, apellido, correo, password } = req.body;
+    const id_rol = 4; // Always Visitante — role changes happen via admin or business approval
 
     // Check if user already exists
     const existingUser = await User.findByEmail(correo);

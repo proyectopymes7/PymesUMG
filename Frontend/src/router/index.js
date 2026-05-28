@@ -81,10 +81,7 @@ router.beforeEach((to) => {
   if (to.path.startsWith('/admin') && !authStore.hasAdminPanel) {
     return authStore.isAuthenticated ? '/' : '/login'
   }
-  if (to.path === '/mi-negocio' && !authStore.isEmprendedor) {
-    return authStore.isAuthenticated ? '/' : '/login'
-  }
-  if (to.meta?.requiresAuth && !authStore.isAuthenticated) {
+if (to.meta?.requiresAuth && !authStore.isAuthenticated) {
     return '/login'
   }
   if ((to.path === '/login' || to.path === '/register') && authStore.isAuthenticated) {

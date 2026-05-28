@@ -145,7 +145,7 @@ const updateEmprendimiento = async (req, res) => {
     const updateData = req.body;
 
     // Auto-promote Visitante (4) → Emprendedor (3) when business is approved
-    if (updateData.estado === 'APROBADO') {
+    if (updateData.estado === 'activo') {
       const owner = await User.findById(emprendimiento.id_usuario);
       if (owner && owner.id_rol === 4) {
         await User.updateRole(emprendimiento.id_usuario, 3);

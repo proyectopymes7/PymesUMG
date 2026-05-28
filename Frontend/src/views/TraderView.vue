@@ -22,8 +22,62 @@ const showToast = (msg, type = 'success') => {
 const loading = ref(true)
 const saving = ref(false)
 const business = ref(null)
+const allBusinesses = ref([])
 const categories = ref([])
 const activeTab = ref('general')
+
+// ── Status helpers ──────────────────────────────────────
+const statusDot = (estado) => ({
+  pendiente: 'bg-yellow-400',
+  activo:    'bg-emerald-500',
+  rechazado: 'bg-red-500',
+  inactivo:  'bg-slate-400'
+}[estado] ?? 'bg-slate-400')
+
+const statusLabel = (estado) => ({
+  pendiente: 'En revisión',
+  activo:    'Publicado',
+  rechazado: 'Rechazado',
+  inactivo:  'Inactivo'
+}[estado] ?? estado)
+
+const statusBadgeClass = (estado) => ({
+  pendiente: 'bg-yellow-100 text-yellow-700',
+  activo:    'bg-emerald-100 text-emerald-700',
+  rechazado: 'bg-red-100 text-red-700',
+  inactivo:  'bg-slate-100 text-slate-500'
+}[estado] ?? 'bg-slate-100 text-slate-500')
+
+// ── Select / load a business into the form ──────────────
+const selectBusiness = (b) => {
+  business.value = b
+  logoPreview.value = b.logo || null
+  logoFile.value = null
+  const rawWa = (b.socials?.whatsapp || '').replace('https://wa.me/', '')
+  form.value = {
+    nombre:      b.name || '',
+    descripcion: b.description || '',
+    whatsapp:    rawWa,
+    facebook:    b.socials?.facebook || '',
+    instagram:   b.socials?.instagram || '',
+    horario:     b.horario || '',
+    locationData: {
+      lat:          b.lat || null,
+      lng:          b.lng || null,
+      departamento: b.departamento || '',
+      municipio:    b.municipio || '',
+      localidad:    b.localidad || '',
+      direccion:    b.location || ''
+    }
+  }
+  const rawIds = b.categorias_ids
+  selectedCategorias.value = Array.isArray(rawIds)
+    ? rawIds
+    : (rawIds ? String(rawIds).split(',').map(Number).filter(Boolean) : [])
+  selectedDays.value = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
+  activeTab.value = 'general'
+  products.value = []
+}
 
 // ── Form ────────────────────────────────────────────────
 const form = ref({
@@ -154,38 +208,15 @@ const executeDelete = async (id) => {
 
 // ── Load ────────────────────────────────────────────────
 onMounted(async () => {
-  if (!authStore.isEmprendedor) { router.push('/'); return }
   try {
-    const [businesses, cats] = await Promise.all([getMyBusinesses(), getRawCategories()])
+    const [businesses, cats] = await Promise.all([
+      getMyBusinesses(),
+      getRawCategories(),
+      authStore.refreshUser()   // sync role in case admin just approved a business
+    ])
     categories.value = cats
-    if (businesses.length > 0) {
-      business.value = businesses[0]
-      logoPreview.value = business.value.logo || null
-      const rawWa = (business.value.socials?.whatsapp || '').replace('https://wa.me/', '')
-      form.value = {
-        nombre:      business.value.name || '',
-        descripcion: business.value.description || '',
-        whatsapp:    rawWa,
-        facebook:    business.value.socials?.facebook || '',
-        instagram:   business.value.socials?.instagram || '',
-        horario:     business.value.horario || '',
-        locationData: {
-          lat:          business.value.lat || null,
-          lng:          business.value.lng || null,
-          departamento: business.value.departamento || '',
-          municipio:    business.value.municipio || '',
-          localidad:    business.value.localidad || '',
-          direccion:    business.value.location || ''
-        }
-      }
-      // Parse categorias
-      const rawIds = business.value.categorias_ids
-      selectedCategorias.value = Array.isArray(rawIds)
-        ? rawIds
-        : (rawIds ? String(rawIds).split(',').map(Number).filter(Boolean) : [])
-      // Parse horario
-      selectedDays.value = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']
-    }
+    allBusinesses.value = businesses
+    if (businesses.length > 0) selectBusiness(businesses[0])
   } catch (e) { console.error(e) }
   finally { loading.value = false }
 })
@@ -260,22 +291,72 @@ const saveGeneral = async () => {
       <div class="w-12 h-12 border-4 border-fiery-red border-t-transparent rounded-full animate-spin"></div>
     </div>
 
-    <!-- Sin negocio -->
-    <div v-else-if="!business" class="flex flex-col items-center justify-center min-h-screen gap-4 px-6 text-center">
+    <!-- Sin negocios registrados -->
+    <div v-else-if="allBusinesses.length === 0" class="flex flex-col items-center justify-center min-h-screen gap-4 px-6 text-center">
       <div class="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mb-2">
         <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
         </svg>
       </div>
-      <h2 class="text-2xl font-black text-fiery-navy uppercase tracking-tighter">Sin negocio aún</h2>
-      <p class="text-slate-500 text-sm max-w-sm">Tu negocio aún no ha sido aprobado o no tienes uno registrado.</p>
+      <h2 class="text-2xl font-black text-fiery-navy uppercase tracking-tighter">Aún no tienes negocios</h2>
+      <p class="text-slate-500 text-sm max-w-sm">Registra tu primer negocio gratis y conéctate con clientes en toda Guatemala.</p>
       <button @click="router.push('/registrar-negocio')" class="mt-2 bg-fiery-red text-white px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fiery-darkred transition-all shadow-lg">
         Registrar mi negocio
       </button>
     </div>
 
     <!-- Panel principal -->
-    <main v-else class="pt-[88px] pb-20 container mx-auto px-4 sm:px-6 max-w-3xl">
+    <main v-else class="pb-20">
+
+      <!-- ── Selector de negocios ── -->
+      <div class="pt-[88px] bg-white border-b border-slate-100">
+        <div class="container mx-auto px-4 sm:px-6 max-w-3xl py-3">
+          <div class="flex items-center gap-2 overflow-x-auto trader-scroll pb-0.5">
+            <button v-for="b in allBusinesses" :key="b.id"
+              @click="selectBusiness(b)"
+              :class="['flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide transition-all whitespace-nowrap flex-shrink-0 border',
+                business?.id === b.id
+                  ? 'bg-fiery-navy text-white border-fiery-navy'
+                  : 'bg-white text-slate-400 border-slate-200 hover:border-fiery-navy hover:text-fiery-navy']">
+              <span class="w-1.5 h-1.5 rounded-full flex-shrink-0" :class="statusDot(b.estado)"></span>
+              {{ b.name }}
+            </button>
+            <button @click="router.push('/registrar-negocio')"
+              class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide bg-white text-fiery-red border border-fiery-red/40 hover:bg-fiery-red hover:text-white transition-all whitespace-nowrap flex-shrink-0">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+              </svg>
+              Agregar negocio
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Contenido ── -->
+      <div class="container mx-auto px-4 sm:px-6 max-w-3xl pt-8">
+
+        <!-- ── Banner de estado ── -->
+        <div v-if="business.estado === 'pendiente'"
+          class="mb-6 flex items-start gap-3 bg-yellow-50 border border-yellow-200 rounded-2xl px-5 py-4">
+          <svg class="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <p class="text-sm font-black text-yellow-800">En revisión</p>
+            <p class="text-xs text-yellow-700 mt-0.5">Tu negocio está siendo revisado por el equipo. Puedes actualizar la información mientras esperas la aprobación.</p>
+          </div>
+        </div>
+
+        <div v-if="business.estado === 'rechazado'"
+          class="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 rounded-2xl px-5 py-4">
+          <svg class="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+          </svg>
+          <div>
+            <p class="text-sm font-black text-red-800">Negocio rechazado</p>
+            <p class="text-xs text-red-700 mt-0.5">Tu negocio no fue aprobado. Actualiza la información y guarda los cambios para que el equipo lo revise nuevamente.</p>
+          </div>
+        </div>
 
       <!-- Header con logo del negocio -->
       <div class="mb-8 flex flex-col sm:flex-row items-center sm:items-end gap-5">
@@ -299,7 +380,13 @@ const saveGeneral = async () => {
         <div class="text-center sm:text-left">
           <h4 class="text-fiery-red font-black uppercase tracking-[0.3em] text-xs mb-1">Mi Negocio</h4>
           <h1 class="text-3xl sm:text-4xl font-black text-fiery-navy uppercase tracking-tighter leading-none">{{ business.name }}</h1>
-          <p class="text-slate-400 text-sm mt-1">{{ business.location || 'Sin ubicación' }}</p>
+          <div class="flex items-center gap-2 mt-1.5 justify-center sm:justify-start flex-wrap">
+            <span class="inline-flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full" :class="statusBadgeClass(business.estado)">
+              <span class="w-1.5 h-1.5 rounded-full" :class="statusDot(business.estado)"></span>
+              {{ statusLabel(business.estado) }}
+            </span>
+            <p class="text-slate-400 text-sm">{{ business.location || 'Sin ubicación' }}</p>
+          </div>
         </div>
       </div>
 
@@ -548,12 +635,15 @@ const saveGeneral = async () => {
         </div>
       </div>
 
+      </div><!-- /container -->
     </main>
   </div>
 </template>
 
 <style scoped>
 .font-outfit { font-family: 'Outfit', sans-serif; }
+.trader-scroll { scrollbar-width: none; }
+.trader-scroll::-webkit-scrollbar { display: none; }
 .toast-enter-active, .toast-leave-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .toast-enter-from { opacity: 0; transform: translateX(110%); }
 .toast-leave-to   { opacity: 0; transform: translateX(110%); }
