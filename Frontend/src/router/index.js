@@ -7,6 +7,8 @@ import AdminDashboardView from '../views/AdminDashboardView.vue'
 import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import EditProfileView from '../views/ProfileView.vue'
+import BusinessRegisterView from '../views/BusinessRegisterView.vue'
+import TraderView from '../views/TraderView.vue'
 import { useAuthStore } from '../stores/auth'
 import ImageUploadTestView from '../views/ImageUploadTestView.vue'
 
@@ -55,6 +57,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/registrar-negocio',
+      name: 'business-register',
+      component: BusinessRegisterView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/mi-negocio',
+      name: 'trader',
+      component: TraderView,
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/test-upload',
       name: 'test-upload',
       component: ImageUploadTestView
@@ -65,6 +79,9 @@ const router = createRouter({
 router.beforeEach((to) => {
   const authStore = useAuthStore()
   if (to.path.startsWith('/admin') && !authStore.hasAdminPanel) {
+    return authStore.isAuthenticated ? '/' : '/login'
+  }
+  if (to.path === '/mi-negocio' && !authStore.isEmprendedor) {
     return authStore.isAuthenticated ? '/' : '/login'
   }
   if (to.meta?.requiresAuth && !authStore.isAuthenticated) {

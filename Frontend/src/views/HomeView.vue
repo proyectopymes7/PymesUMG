@@ -319,7 +319,7 @@ onUnmounted(() => {
           Miles de clientes buscan negocios como el tuyo todos los días.<br class="hidden md:block">
           Regístralo gratis y empieza a recibir visitas hoy mismo.
         </p>
-        <button @click="$router.push('/register')" class="dir-cta-btn">
+        <button @click="$router.push('/registrar-negocio')" class="dir-cta-btn">
           <span class="dir-cta-shine" aria-hidden="true"></span>
           Registrar mi negocio gratis
         </button>

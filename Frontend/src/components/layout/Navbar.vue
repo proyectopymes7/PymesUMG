@@ -68,6 +68,10 @@ const goToProfile = () => {
           <span class="w-2 h-2 bg-fiery-red rounded-full animate-pulse"></span>
           Admin
         </RouterLink>
+        <RouterLink v-if="authStore.isEmprendedor" to="/mi-negocio" class="text-fiery-red hover:text-fiery-darkred transition-colors relative group py-2 flex items-center gap-2">
+          <span class="w-2 h-2 bg-fiery-red rounded-full animate-pulse"></span>
+          Mi Negocio
+        </RouterLink>
       </div>
 
       <!-- Actions -->
@@ -113,6 +117,19 @@ const goToProfile = () => {
                   <p class="text-[10px] text-slate-400 truncate">{{ authStore.user?.correo }}</p>
                 </div>
               </div>
+
+              <!-- Mi Negocio en dropdown para emprendedores -->
+              <RouterLink
+                v-if="authStore.isEmprendedor"
+                to="/mi-negocio"
+                @click="isUserDropdownOpen = false"
+                class="flex items-center gap-3 px-5 py-3 rounded-2xl hover:bg-slate-50 text-fiery-navy transition-all"
+              >
+                <svg class="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                <span class="text-[11px] font-black uppercase tracking-widest">Mi Negocio</span>
+              </RouterLink>
 
               <!-- Editar perfil -->
               <button
@@ -163,6 +180,7 @@ const goToProfile = () => {
         <RouterLink @click="isMenuOpen = false" to="/directorio" class="text-xl font-black">Directorio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/blog" class="text-xl font-black">Blog</RouterLink>
         <RouterLink v-if="authStore.hasAdminPanel" @click="isMenuOpen = false" to="/admin" class="text-xl font-black text-fiery-red">Panel Admin</RouterLink>
+        <RouterLink v-if="authStore.isEmprendedor" @click="isMenuOpen = false" to="/mi-negocio" class="text-xl font-black text-fiery-red">Mi Negocio</RouterLink>
 
         <div v-if="authStore.isAuthenticated" class="w-full flex flex-col items-center border-t pt-6 gap-3">
           <div class="w-16 h-16 rounded-full overflow-hidden shadow-md border-4 border-slate-100 mx-auto">

@@ -84,7 +84,7 @@ const handleAction = async (id, action) => {
     return
   }
   
-  const estado = action === 'approve' ? 'activo' : 'rechazado'
+  const estado = action === 'approve' ? 'APROBADO' : 'rechazado'
   try {
     await updateBusinessStatus(id, estado)
     await fetchData()
@@ -178,7 +178,7 @@ onMounted(fetchData)
   <div class="min-h-screen bg-slate-50">
     <Navbar />
     
-    <main class="pt-[88px] pb-20 container mx-auto px-4 sm:px-6 transition-all">
+    <main class="pt-[120px] pb-20 container mx-auto px-4 sm:px-6 transition-all">
       <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-12 gap-6">
         <div>
           <h4 class="text-fiery-red font-black uppercase tracking-[0.3em] text-xs mb-2">Panel de Control</h4>

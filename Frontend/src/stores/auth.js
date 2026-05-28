@@ -25,7 +25,7 @@ export const useAuthStore = defineStore('auth', {
     isAdmin: (state) => state.user?.id_rol === 1 || state.user?.id_rol === 2,
     isEmprendedor: (state) => state.user?.id_rol === 3,
     isVisitante: (state) => state.user?.id_rol === 4,
-    hasAdminPanel: (state) => state.user?.id_rol === 1 || state.user?.id_rol === 2 || state.user?.id_rol === 3,
+    hasAdminPanel: (state) => state.user?.id_rol === 1 || state.user?.id_rol === 2,
     userName: (state) => state.user ? `${state.user.nombre}` : '',
     userFullName: (state) => state.user ? `${state.user.nombre} ${state.user.apellido}` : '',
     userInitial: (state) => state.user?.nombre ? state.user.nombre.charAt(0).toUpperCase() : '?'
@@ -38,13 +38,13 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await api.post('/auth/login', { correo, password })
         const { user, token } = response.data.data
-        
+
         this.user = user
         this.token = token
-        
+
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
-        
+
         return true
       } catch (err) {
         this.error = err.response?.data?.message || 'Error al iniciar sesión'
@@ -60,13 +60,13 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await api.post('/auth/register', { nombre, apellido, correo, password })
         const { user, token } = response.data.data
-        
+
         this.user = user
         this.token = token
-        
+
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
-        
+
         return true
       } catch (err) {
         if (err.response?.data?.details) {
@@ -86,13 +86,13 @@ export const useAuthStore = defineStore('auth', {
       try {
         const response = await api.post('/auth/google', { access_token: accessToken })
         const { user, token } = response.data.data
-        
+
         this.user = user
         this.token = token
-        
+
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
-        
+
         return true
       } catch (err) {
         this.error = err.response?.data?.message || 'Error al iniciar sesión con Google'
