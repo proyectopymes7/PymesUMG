@@ -103,7 +103,9 @@ const getEmprendimientoById = async (req, res) => {
       });
     }
 
-    if (emprendimiento.estado !== 'APROBADO' && !isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
+    const estadoNorm = emprendimiento.estado?.toLowerCase()
+    const isPublic = estadoNorm === 'activo' || estadoNorm === 'aprobado'
+    if (!isPublic && !isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You do not have permission to view this emprendimiento'
