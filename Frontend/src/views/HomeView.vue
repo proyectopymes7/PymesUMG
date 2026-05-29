@@ -72,7 +72,7 @@ const loadNearby = async (lat, lng) => {
   nearbyLoading.value = true
   nearbyError.value = ''
   try {
-    nearbyBusinesses.value = await getNearbyBusinesses(lat, lng, 15)
+    nearbyBusinesses.value = await getNearbyBusinesses(lat, lng, 200)
   } catch {
     nearbyError.value = 'unavailable'
   } finally {
@@ -80,16 +80,33 @@ const loadNearby = async (lat, lng) => {
   }
 }
 
-const requestLocation = () => {
+const permissionBlocked = ref(false)
+
+const requestLocation = async () => {
   if (!navigator.geolocation) { nearbyError.value = 'unavailable'; return }
+
+  // Detectar si el permiso está bloqueado permanentemente por el browser
+  if (navigator.permissions) {
+    try {
+      const status = await navigator.permissions.query({ name: 'geolocation' })
+      if (status.state === 'denied') {
+        permissionBlocked.value = true
+        nearbyError.value = 'denied'
+        return
+      }
+    } catch { /* algunos browsers no soportan permissions.query */ }
+  }
+
+  permissionBlocked.value = false
   nearbyLoading.value = true
+  nearbyError.value = ''
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
       userCoords.value = { lat: coords.latitude, lng: coords.longitude }
       loadNearby(coords.latitude, coords.longitude)
     },
     () => { nearbyLoading.value = false; nearbyError.value = 'denied' },
-    { timeout: 8000 }
+    { timeout: 10000, enableHighAccuracy: false }
   )
 }
 
@@ -373,17 +390,30 @@ onUnmounted(() => {
           <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           </div>
-          <p class="font-black text-fiery-navy text-lg mb-2">Ubicación no disponible</p>
-          <p class="text-slate-400 text-sm mb-6">Permite el acceso a tu ubicación para ver negocios cercanos</p>
-          <button @click="requestLocation" class="px-7 py-3.5 bg-fiery-red text-white rounded-2xl font-black text-sm hover:bg-fiery-darkred transition-all shadow-lg shadow-fiery-red/20">
-            Permitir ubicación
-          </button>
+          <template v-if="permissionBlocked">
+            <p class="font-black text-fiery-navy text-lg mb-2">Permiso bloqueado</p>
+            <p class="text-slate-400 text-sm mb-2">Tu navegador tiene bloqueado el acceso a la ubicación para este sitio.</p>
+            <p class="text-slate-400 text-xs mb-6">Ve a la barra de dirección → ícono de candado 🔒 → Permisos del sitio → Ubicación → Permitir</p>
+            <button @click="requestLocation" class="px-7 py-3.5 bg-slate-200 text-slate-600 rounded-2xl font-black text-sm hover:bg-slate-300 transition-all">
+              Intentar de nuevo
+            </button>
+          </template>
+          <template v-else>
+            <p class="font-black text-fiery-navy text-lg mb-2">Ubicación no disponible</p>
+            <p class="text-slate-400 text-sm mb-6">Permite el acceso a tu ubicación para ver negocios cercanos</p>
+            <button @click="requestLocation" class="px-7 py-3.5 bg-fiery-red text-white rounded-2xl font-black text-sm hover:bg-fiery-darkred transition-all shadow-lg shadow-fiery-red/20">
+              Permitir ubicación
+            </button>
+          </template>
         </div>
 
         <!-- Estado: sin resultados -->
-        <div v-else-if="!nearbyLoading && nearbyBusinesses.length === 0 && userCoords" class="text-center py-8">
-          <p class="font-black text-fiery-navy mb-1">Sin negocios cercanos</p>
-          <p class="text-slate-400 text-sm">No encontramos negocios registrados en un radio de 15 km</p>
+        <div v-else-if="!nearbyLoading && nearbyBusinesses.length === 0 && userCoords" class="bg-white rounded-3xl p-10 text-center border border-slate-100 shadow-sm">
+          <p class="font-black text-fiery-navy mb-2">Sin negocios con ubicación aún</p>
+          <p class="text-slate-400 text-sm mb-5">Los negocios registrados aún no tienen coordenadas guardadas. Puedes explorar todos en el directorio.</p>
+          <RouterLink to="/directorio" class="inline-flex items-center gap-2 px-6 py-3 bg-fiery-navy text-white rounded-2xl font-black text-sm hover:opacity-80 transition-all">
+            Ver directorio completo →
+          </RouterLink>
         </div>
 
         <!-- Resultados con animación escalonada -->

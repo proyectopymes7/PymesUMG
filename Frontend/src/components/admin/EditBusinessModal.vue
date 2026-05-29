@@ -487,6 +487,7 @@ const executeDelete = async (id) => {
                 Categorías <span class="text-slate-300 font-normal normal-case">(máx. 3)</span>
               </label>
               <button type="button" @click="categoryDropdownOpen = !categoryDropdownOpen"
+                @blur="setTimeout(() => { categoryDropdownOpen = false }, 150)"
                 class="w-full min-h-[44px] border border-slate-200 bg-white rounded-xl px-4 py-2 flex items-center flex-wrap gap-2 text-left focus:outline-none focus:border-fiery-red transition-all">
                 <span v-if="selectedCategorias.length === 0" class="text-slate-400 text-sm font-medium">Selecciona categorías...</span>
                 <span v-for="id in selectedCategorias" :key="id"
@@ -497,7 +498,7 @@ const executeDelete = async (id) => {
                 </span>
                 <svg class="w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform" :class="categoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
               </button>
-              <div v-if="categoryDropdownOpen" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+              <div v-if="categoryDropdownOpen" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto" @click.stop>
                 <button v-for="cat in categories" :key="cat.id_categoria" type="button"
                   :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
                   @click="selectedCategorias.includes(cat.id_categoria)

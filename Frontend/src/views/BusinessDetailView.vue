@@ -70,10 +70,14 @@ const averageRating = computed(() => {
 })
 const reviewCount = computed(() => reviews.value.length)
 
+const MAPS_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+
 const mapUrl = computed(() => {
   if (!business.value) return ''
   if (business.value.lat && business.value.lng) {
-    return `https://maps.google.com/maps?q=${business.value.lat},${business.value.lng}&z=16&output=embed`
+    const lat = business.value.lat
+    const lng = business.value.lng
+    return `https://maps.google.com/maps?q=${lat},${lng}&ll=${lat},${lng}&z=16&output=embed`
   }
   const query = encodeURIComponent(business.value.location || business.value.name)
   return `https://maps.google.com/maps?q=${query}&output=embed`
