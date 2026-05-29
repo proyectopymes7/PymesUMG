@@ -143,7 +143,7 @@ onMounted(async () => {
   // Esperar al siguiente frame para que el contenedor esté visible
   // (necesario cuando se monta dentro de un modal con animación)
   await nextTick()
-  await new Promise(r => setTimeout(r, 50))
+  await new Promise(r => setTimeout(r, 300)) // esperar animación de transición de paso
 
   try {
     await loadGoogleMaps()

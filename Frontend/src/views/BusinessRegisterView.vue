@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import { useAuthStore } from '../stores/auth'
 import { getRawCategories, uploadImage, uploadProductImage } from '../services/businessService'
 import api from '../services/api'
+import ImageSuggestModal from '../components/shared/ImageSuggestModal.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -27,6 +28,15 @@ const submitting = ref(false)
 const categories = ref([])
 const selectedCategorias = ref([])
 const showCategoryDropdown = ref(false)
+const nombreFilled = ref(false)
+let nombreTimer = null
+const onNombreInput = () => {
+  clearTimeout(nombreTimer)
+  nombreFilled.value = false
+  if (form.value.nombre?.trim().length >= 3) {
+    nombreTimer = setTimeout(() => { nombreFilled.value = true }, 800)
+  }
+}
 
 // ── Foto del negocio (opcional) ─────────────────────────
 const businessImageFile = ref(null)
@@ -50,6 +60,12 @@ const clearBusinessImage = () => {
   if (businessImageInputRef.value) businessImageInputRef.value.value = ''
 }
 
+const showImageSuggest = ref(false)
+const onImageSuggested = (url) => {
+  businessImagePreview.value = url
+  businessImageFile.value = null // ya está en Azure, no necesita re-subirse
+}
+
 const form = ref({
   nombre: '',
   descripcion: '',
@@ -57,10 +73,7 @@ const form = ref({
   facebook: '',
   instagram: '',
   horario: '',
-  locationData: {
-    lat: null, lng: null,
-    departamento: '', municipio: '', localidad: '', direccion: ''
-  }
+  locationData: { lat: null, lng: null, departamento: '', municipio: '', localidad: '', direccion: '' }
 })
 
 // Horario
@@ -249,6 +262,18 @@ const submitRequest = async () => {
 
     const loc = form.value.locationData || {}
 
+    // 1. Subir foto ANTES de crear el negocio para incluirla en el POST
+    let logoUrl = null
+    if (businessImageFile.value) {
+      try {
+        logoUrl = await uploadImage(businessImageFile.value, 'logos')
+      } catch (imgErr) {
+        showToast('No se pudo subir la foto, el negocio se creará sin imagen', 'error')
+      }
+    } else if (businessImagePreview.value?.startsWith('https://')) {
+      logoUrl = businessImagePreview.value
+    }
+
     const payload = {
       nombre:       form.value.nombre.trim(),
       descripcion:  form.value.descripcion.trim(),
@@ -256,30 +281,22 @@ const submitRequest = async () => {
       estado:       'pendiente'
     }
 
-    if (horarioStr)           payload.horario      = horarioStr
-    if (form.value.whatsapp)  payload.whatsapp     = form.value.whatsapp.trim()
+    if (logoUrl)               payload.logo_url     = logoUrl
+    if (horarioStr)            payload.horario      = horarioStr
+    if (form.value.whatsapp)   payload.whatsapp     = form.value.whatsapp.trim()
     payload.facebook  = (form.value.facebook  || '').trim()
     payload.instagram = (form.value.instagram || '').trim()
-    if (loc.departamento)     payload.departamento = loc.departamento
-    if (loc.municipio)        payload.municipio    = loc.municipio
-    if (loc.localidad)        payload.localidad    = loc.localidad
-    if (loc.direccion)        payload.direccion    = loc.direccion
-    if (loc.lat)              payload.latitud      = loc.lat
-    if (loc.lng)              payload.longitud     = loc.lng
+    if (loc.departamento)      payload.departamento = loc.departamento
+    if (loc.municipio)         payload.municipio    = loc.municipio
+    if (loc.localidad)         payload.localidad    = loc.localidad
+    if (loc.direccion)         payload.direccion    = loc.direccion
+    // Coordenadas: usar Number() para asegurar tipo correcto
+    if (loc.lat)  payload.latitud  = loc.lat
+    if (loc.lng)  payload.longitud = loc.lng
 
-    // 1. Crear el emprendimiento
+    // 2. Crear el emprendimiento con todo incluido
     const res = await api.post('/emprendimientos', payload)
     const newId = res.data?.data?.id_emprendimiento
-
-    // 2. Subir foto del negocio si hay (comprimida y como logo)
-    if (newId && businessImageFile.value) {
-      try {
-        const logoUrl = await uploadImage(businessImageFile.value, 'logos')
-        await api.put(`/emprendimientos/${newId}`, { logo_url: logoUrl })
-      } catch (imgErr) {
-        console.warn('No se pudo subir la foto del negocio:', imgErr)
-      }
-    }
 
     // 3. Subir productos si hay
     if (newId && products.value.length > 0) {
@@ -311,6 +328,7 @@ const submitRequest = async () => {
       }
     }
 
+    clearDraft()
     showToast('¡Solicitud enviada! El administrador la revisará pronto.', 'success')
     setTimeout(() => router.push('/'), 2500)
   } catch (error) {
@@ -324,9 +342,48 @@ const submitRequest = async () => {
   }
 }
 
+const DRAFT_KEY = 'business_register_draft'
+
+// Guardar borrador automáticamente cada vez que cambia el formulario
+watch([form, selectedCategorias, selectedDays, openTime, closeTime], () => {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      form: form.value,
+      selectedCategorias: selectedCategorias.value,
+      selectedDays: selectedDays.value,
+      openTime: openTime.value,
+      closeTime: closeTime.value,
+      savedAt: Date.now()
+    }))
+  } catch {}
+}, { deep: true })
+
+const clearDraft = () => localStorage.removeItem(DRAFT_KEY)
+
 const onKeydown = (e) => { if (e.key === 'Escape') router.back() }
 onMounted(async () => {
   categories.value = await getRawCategories()
+
+  // Restaurar borrador si existe (menos de 24 horas)
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (raw) {
+      const draft = JSON.parse(raw)
+      const age = Date.now() - (draft.savedAt || 0)
+      if (age < 86400000) { // 24h
+        form.value = { ...form.value, ...draft.form }
+        if (draft.form?.locationData) form.value.locationData = draft.form.locationData
+        selectedCategorias.value = draft.selectedCategorias || []
+        selectedDays.value = draft.selectedDays || selectedDays.value
+        openTime.value = draft.openTime || openTime.value
+        closeTime.value = draft.closeTime || closeTime.value
+        showToast('Borrador restaurado', 'success')
+      } else {
+        clearDraft()
+      }
+    }
+  } catch {}
+
   window.addEventListener('keydown', onKeydown)
 })
 onUnmounted(() => window.removeEventListener('keydown', onKeydown))
@@ -388,6 +445,17 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             <span class="text-[10px] text-slate-300 font-bold uppercase tracking-widest">Opcional</span>
           </div>
 
+          <ImageSuggestModal
+            :show="showImageSuggest"
+            :nombre="form.nombre"
+            :categoria="categories.find(c => selectedCategorias.includes(c.id_categoria))?.nombre"
+            :descripcion="form.descripcion"
+            :municipio="form.locationData?.municipio"
+            :departamento="form.locationData?.departamento"
+            @close="showImageSuggest = false"
+            @selected="onImageSuggested"
+          />
+
           <input ref="businessImageInputRef" type="file" accept="image/*" class="hidden" @change="handleBusinessImageChange" />
 
           <!-- Preview -->
@@ -419,6 +487,20 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             <p class="text-sm font-bold text-slate-400 group-hover:text-fiery-navy transition-colors">Subir foto del negocio</p>
             <p class="text-xs text-slate-300 mt-1">JPG, PNG o WEBP · Máx. 5MB</p>
           </div>
+
+          <!-- Botón sugerencias IA (aparece cuando el usuario deja de escribir el nombre) -->
+          <transition name="fade-slide">
+            <div v-if="nombreFilled" class="flex flex-col items-center gap-1.5 mt-2">
+              <button type="button" @click="showImageSuggest = true"
+                class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                <span>✦</span>
+                Sugerencias de IA
+              </button>
+              <p class="text-[10px] text-slate-400 text-center">
+                Escribe una descripción y elige categorías para mejores resultados
+              </p>
+            </div>
+          </transition>
         </div>
 
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-5">
@@ -429,6 +511,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             <input
               v-model="form.nombre" type="text" maxlength="100"
               placeholder="Ej. Café El Despertar"
+              @input="onNombreInput"
               :class="['w-full border rounded-xl px-4 py-3 text-sm font-semibold text-fiery-navy focus:outline-none focus:ring-2 transition-all', errors.nombre ? 'border-red-300 focus:ring-red-200' : 'border-slate-200 focus:ring-fiery-navy/20 focus:border-fiery-navy']"
             />
             <p v-if="errors.nombre" class="text-[10px] text-red-500 font-bold mt-1">{{ errors.nombre }}</p>
@@ -477,7 +560,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <svg class="w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform" :class="showCategoryDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
             </button>
             <!-- Dropdown list -->
-            <div v-if="showCategoryDropdown" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto" @click.stop>
+            <div v-if="showCategoryDropdown" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto" style="scrollbar-width:none;-ms-overflow-style:none;" @click.stop>
               <button v-for="cat in categories" :key="cat.id_categoria" type="button"
                 :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
                 @click="selectedCategorias.includes(cat.id_categoria)
@@ -747,6 +830,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .toast-enter-active, .toast-leave-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .toast-enter-from { opacity: 0; transform: translateX(110%); }
 .toast-leave-to   { opacity: 0; transform: translateX(110%); }
+
+/* Animación del botón IA */
+.fade-slide-enter-active { transition: opacity 0.3s ease, transform 0.3s ease; }
+.fade-slide-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.fade-slide-enter-from, .fade-slide-leave-to { opacity: 0; transform: translateY(-6px); }
 
 /* Transición suave entre pasos */
 .step-fade-enter-active { transition: opacity 0.35s ease, transform 0.35s ease; }

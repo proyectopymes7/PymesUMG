@@ -16,6 +16,7 @@ const valoracionesRoutes = require('./routes/valoraciones');
 const sugerenciasRoutes = require('./routes/sugerencias');
 const calificacionesRoutes = require('./routes/calificaciones');
 const aiRoutes = require('./routes/ai');
+const aiImagesRoutes = require('./routes/aiImages');
 
 const errorHandler = require('./middleware/errorHandler');
 const { rateLimiterMiddleware } = require('./middleware/rateLimiter');
@@ -130,6 +131,7 @@ app.use('/api/valoraciones', valoracionesRoutes);
 app.use('/api/sugerencias', sugerenciasRoutes);
 app.use('/api/calificaciones', calificacionesRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/ai', aiImagesRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -81,13 +81,27 @@ const toggleCatActive = async (cat) => {
 const allUsers = ref([])
 const loading = ref(false)
 const businessFilter = ref('todos')
+const businessSearch = ref('')
 
 const isActive = (b) => b.status === 'activo' || b.status === 'aprobado'
 
 const filteredBusinesses = computed(() => {
-  if (businessFilter.value === 'activos') return allBusinesses.value.filter(isActive)
-  if (businessFilter.value === 'inactivos') return allBusinesses.value.filter(b => !isActive(b))
-  return allBusinesses.value
+  const search = businessSearch.value.toLowerCase().trim()
+  let list = allBusinesses.value
+
+  if (businessFilter.value === 'activos') list = list.filter(isActive)
+  else if (businessFilter.value === 'inactivos') list = list.filter(b => !isActive(b))
+
+  if (search) {
+    list = list.filter(b =>
+      b.name?.toLowerCase().includes(search) ||
+      b.category?.toLowerCase().includes(search) ||
+      b.location?.toLowerCase().includes(search) ||
+      String(b.id).includes(search)
+    )
+  }
+
+  return list
 })
 
 const countActivos   = computed(() => allBusinesses.value.filter(isActive).length)
@@ -402,8 +416,20 @@ onMounted(fetchData)
 
         <!-- Businesses Tab -->
         <div v-if="activeTab === 'businesses'" class="space-y-4">
-          <!-- Filtros -->
-          <div class="flex items-center gap-2">
+          <!-- Buscador -->
+          <div class="relative">
+            <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input
+              v-model="businessSearch"
+              type="text"
+              placeholder="Buscar por nombre, categoría, ubicación o ID..."
+              class="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white text-fiery-navy font-bold text-sm outline-none focus:border-fiery-red transition-all"
+            />
+            <button v-if="businessSearch" @click="businessSearch = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>
+          </div>
+
+          <!-- Filtros de estado -->
+          <div class="flex items-center gap-2 flex-wrap">
             <button
               @click="businessFilter = 'todos'"
               :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'todos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
@@ -416,6 +442,9 @@ onMounted(fetchData)
               @click="businessFilter = 'inactivos'"
               :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'inactivos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
             >Inactivos <span class="opacity-60">({{ countInactivos }})</span></button>
+            <span v-if="businessSearch" class="text-xs text-slate-400 ml-1">
+              {{ filteredBusinesses.length }} resultado{{ filteredBusinesses.length !== 1 ? 's' : '' }}
+            </span>
           </div>
 
           <!-- Mobile cards -->

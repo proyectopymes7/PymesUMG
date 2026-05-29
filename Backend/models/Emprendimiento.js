@@ -7,13 +7,13 @@ class Emprendimiento {
         id_usuario, id_categoria, nombre, descripcion, telefono, whatsapp,
         latitud, longitud, horario, vistas, destacado, estado,
         departamento, municipio, localidad, direccion,
-        instagram, facebook, website, fecha_registro
+        instagram, facebook, website, logo_url, fecha_registro
       )
       VALUES (
         @id_usuario, @id_categoria, @nombre, @descripcion, @telefono, @whatsapp,
         @latitud, @longitud, @horario, @vistas, @destacado, @estado,
         @departamento, @municipio, @localidad, @direccion,
-        @instagram, @facebook, @website, GETDATE()
+        @instagram, @facebook, @website, @logo_url, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as id_emprendimiento;
     `;
@@ -38,6 +38,7 @@ class Emprendimiento {
       { name: 'instagram',   value: emprendimientoData.instagram || null,              type: sql.NVarChar },
       { name: 'facebook',    value: emprendimientoData.facebook || null,               type: sql.NVarChar },
       { name: 'website',     value: emprendimientoData.website || null,                type: sql.NVarChar },
+      { name: 'logo_url',   value: emprendimientoData.logo_url || null,               type: sql.NVarChar },
     ];
 
     try {

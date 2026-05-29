@@ -453,7 +453,8 @@ const executeDelete = async (id) => {
       </div>
 
       <!-- Content -->
-      <div class="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
+      <div class="flex-1 overflow-y-auto p-6 bg-slate-50" style="scrollbar-width:none;-ms-overflow-style:none;">
+
         
         <!-- Tab: Información General -->
         <div v-show="activeTab === 'general'" class="space-y-6">
@@ -764,16 +765,9 @@ const executeDelete = async (id) => {
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 10px;
+.custom-scrollbar::-webkit-scrollbar { display: none; }
+.custom-scrollbar::-webkit-scrollbar-track { display: none; }
+.custom-scrollbar::-webkit-scrollbar-thumb { display: none;
 }
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;

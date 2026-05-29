@@ -20,24 +20,11 @@ const productImages = ref([])
 const productImageIdx = ref(0)
 const productImagesCache = ref({})
 
-const DEFAULT_PRODUCT_IMG = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&q=75&auto=format&fit=crop'
-const failedProductImgs = ref(new Set())
-
 const getCardThumbnail = (product) => {
   if (product.tipo === 'servicio') return null
-  // 1. Cache de imágenes reales (prioridad máxima)
   const cached = productImagesCache.value[product.id_producto]
   if (cached?.length) return cached[0].url
-  // 2. URL directa del producto
-  if (product.imagen_url) return product.imagen_url
-  // 3. Si el fallback ya falló, mostrar placeholder
-  if (failedProductImgs.value.has(product.id_producto)) return null
-  // 4. Intentar imagen genérica de fallback
-  return DEFAULT_PRODUCT_IMG
-}
-
-const onProductImgError = (product) => {
-  failedProductImgs.value = new Set([...failedProductImgs.value, product.id_producto])
+  return product.imagen_url || null
 }
 
 const openProductModal = (product) => {
@@ -281,10 +268,10 @@ const submitReview = async () => {
                     :src="getCardThumbnail(product)"
                     :alt="product.nombre"
                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    @error="onProductImgError(product)"
+                    @error="(e) => e.target.style.display='none'"
                   />
                   <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200">
-                    <svg class="w-14 h-14 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
+                    <svg class="w-14 h-14 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                   </div>
                 </div>
                 <div class="p-5 md:p-6">
@@ -459,8 +446,9 @@ const submitReview = async () => {
                 class="w-full object-cover" style="max-height:320px;min-height:220px" />
             </template>
             <template v-else>
-              <img :src="DEFAULT_PRODUCT_IMG" :alt="selectedProduct.nombre"
-                class="w-full object-cover" style="max-height:320px;min-height:220px" />
+              <div class="w-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200" style="min-height:220px">
+                <svg class="w-16 h-16 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              </div>
             </template>
             <button @click="showProductModal = false"
               class="absolute top-3 right-3 w-8 h-8 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white rounded-full flex items-center justify-center font-bold text-lg transition-colors leading-none">×</button>

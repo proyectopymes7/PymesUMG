@@ -129,6 +129,7 @@ const form = ref({
 })
 
 const selectedCategorias = ref([])
+const traderCatOpen = ref(false)
 
 // Horario
 const daysMap = { Lunes: 'Lun', Martes: 'Mar', Miércoles: 'Mié', Jueves: 'Jue', Viernes: 'Vie', Sábado: 'Sáb', Domingo: 'Dom' }
@@ -464,21 +465,28 @@ const saveGeneral = async () => {
 
       <!-- Header con logo del negocio -->
       <div class="mb-8 flex flex-col sm:flex-row items-center sm:items-end gap-5">
-        <!-- Logo editable -->
-        <div class="relative group flex-shrink-0">
+        <!-- Logo editable — toda el área es clickeable -->
+        <div class="relative group flex-shrink-0 cursor-pointer" @click="logoInputRef?.click()">
           <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-slate-100">
             <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-cover" />
             <div v-else class="w-full h-full flex items-center justify-center bg-fiery-navy text-white font-black text-4xl uppercase">
               {{ business.name?.charAt(0) || '?' }}
             </div>
+            <!-- Overlay al hover -->
+            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-3xl">
+              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+            </div>
           </div>
-          <button @click="logoInputRef?.click()"
-            class="absolute bottom-0 right-0 w-8 h-8 bg-fiery-red text-white rounded-full flex items-center justify-center shadow-md hover:bg-fiery-darkred transition-colors">
+          <!-- Botón cámara pequeño en esquina -->
+          <div class="absolute bottom-0 right-0 w-8 h-8 bg-fiery-red text-white rounded-full flex items-center justify-center shadow-md pointer-events-none">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
             </svg>
-          </button>
+          </div>
           <input ref="logoInputRef" type="file" accept="image/*" class="hidden" @change="handleLogoChange" />
         </div>
         <div class="text-center sm:text-left">
@@ -534,21 +542,38 @@ const saveGeneral = async () => {
         </div>
 
         <!-- Categorías -->
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 relative">
           <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-            Categorías <span class="text-slate-300 font-normal normal-case">(mín. 1, máx. 3)</span>
+            Categorías <span class="text-slate-300 font-normal normal-case">(máx. 3)</span>
           </p>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <!-- Backdrop -->
+          <div v-if="traderCatOpen" class="fixed inset-0 z-10" @click="traderCatOpen = false"></div>
+          <!-- Trigger con chips -->
+          <button type="button" @click.stop="traderCatOpen = !traderCatOpen"
+            @blur="setTimeout(() => { traderCatOpen = false }, 150)"
+            class="w-full min-h-[44px] border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 flex items-center flex-wrap gap-2 text-left focus:outline-none focus:border-fiery-navy transition-all">
+            <span v-if="selectedCategorias.length === 0" class="text-slate-400 text-sm font-medium">Selecciona categorías...</span>
+            <span v-for="id in selectedCategorias" :key="id"
+              class="inline-flex items-center gap-1 bg-fiery-navy text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+              {{ categories.find(c => c.id_categoria === id)?.nombre }}
+              <button type="button" @click.stop="selectedCategorias.splice(selectedCategorias.indexOf(id), 1)"
+                class="hover:text-white/60 transition-colors leading-none">×</button>
+            </span>
+            <svg class="w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform" :class="traderCatOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <!-- Dropdown -->
+          <div v-if="traderCatOpen" class="absolute z-20 left-6 right-6 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto" @click.stop>
             <button v-for="cat in categories" :key="cat.id_categoria" type="button"
               :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
               @click="selectedCategorias.includes(cat.id_categoria)
                 ? selectedCategorias.splice(selectedCategorias.indexOf(cat.id_categoria), 1)
-                : selectedCategorias.push(cat.id_categoria)"
-              :class="[
-                'px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all border text-left',
-                selectedCategorias.includes(cat.id_categoria) ? 'bg-fiery-navy text-white border-fiery-navy' : 'bg-white text-slate-500 border-slate-200 hover:border-fiery-red hover:text-fiery-red',
-                (!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3) ? 'opacity-40 cursor-not-allowed' : ''
-              ]">{{ cat.nombre }}</button>
+                : (selectedCategorias.length < 3 && selectedCategorias.push(cat.id_categoria))"
+              class="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-b border-slate-50 last:border-0">
+              <span :class="['w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors', selectedCategorias.includes(cat.id_categoria) ? 'bg-fiery-navy border-fiery-navy' : 'border-slate-300']">
+                <svg v-if="selectedCategorias.includes(cat.id_categoria)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="font-bold text-fiery-navy">{{ cat.nombre }}</span>
+            </button>
           </div>
         </div>
 

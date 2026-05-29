@@ -72,7 +72,7 @@ const loadNearby = async (lat, lng) => {
   nearbyLoading.value = true
   nearbyError.value = ''
   try {
-    nearbyBusinesses.value = await getNearbyBusinesses(lat, lng, 200)
+    nearbyBusinesses.value = await getNearbyBusinesses(lat, lng, 15)
   } catch {
     nearbyError.value = 'unavailable'
   } finally {
