@@ -24,16 +24,26 @@ const register = async (req, res) => {
       });
     }
 
-    const { nombre, apellido, correo, password } = req.body;
-    const id_rol = 4; // Always Visitante — role changes happen via admin or business approval
+    const { nombre, apellido, correo, password, nombre_usuario } = req.body;
+    const id_rol = 4;
 
-    // Check if user already exists
-    const existingUser = await User.findByEmail(correo);
-    if (existingUser) {
-      return res.status(409).json({
-        error: 'Registration failed',
-        message: 'Email already registered'
-      });
+    // nombre_usuario is required for manual registration
+    if (!nombre_usuario) {
+      return res.status(400).json({ error: 'Registration failed', message: 'El nombre de usuario es requerido' });
+    }
+
+    // Check if username is taken
+    const existingUsername = await User.findByUsername(nombre_usuario);
+    if (existingUsername) {
+      return res.status(409).json({ error: 'Registration failed', message: 'El nombre de usuario ya está en uso' });
+    }
+
+    // Check email uniqueness only if provided
+    if (correo) {
+      const existingUser = await User.findByEmail(correo);
+      if (existingUser) {
+        return res.status(409).json({ error: 'Registration failed', message: 'El correo ya está registrado' });
+      }
     }
 
     // Hash password
@@ -46,6 +56,7 @@ const register = async (req, res) => {
       apellido,
       correo,
       password_hash,
+      nombre_usuario: nombre_usuario || null,
       id_rol,
       activo: 1
     };
@@ -86,14 +97,14 @@ const login = async (req, res) => {
       });
     }
 
-    const { correo, password } = req.body;
+    const { identifier, password } = req.body;
 
-    // Find user by email
-    const user = await User.findByEmail(correo);
+    // Find user by email or username
+    const user = await User.findByIdentifier(identifier);
     if (!user) {
       return res.status(401).json({
         error: 'Login failed',
-        message: 'Invalid credentials'
+        message: 'Credenciales inválidas'
       });
     }
 
@@ -125,7 +136,7 @@ const login = async (req, res) => {
         const blockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
         await User.blockUser(user.id_usuario, blockUntil);
 
-        logger.warn(`User blocked due to failed attempts: ${correo}`, {
+        logger.warn(`User blocked due to failed attempts: ${identifier}`, {
           ip: req.ip,
           attempts
         });
@@ -138,7 +149,7 @@ const login = async (req, res) => {
 
       return res.status(401).json({
         error: 'Login failed',
-        message: 'Invalid credentials'
+        message: 'Credenciales inválidas'
       });
     }
 
@@ -153,7 +164,7 @@ const login = async (req, res) => {
     // Remove password from response
     delete user.password_hash;
 
-    logger.info(`User logged in: ${correo}`, { ip: req.ip });
+    logger.info(`User logged in: ${identifier}`, { ip: req.ip });
 
     res.json({
       success: true,
@@ -423,18 +434,19 @@ module.exports = {
   forgotPassword,
   resetPassword,
   validateRegister: [
-    body('nombre')
+    body('nombre').trim().isLength({ min: 2, max: 50 }).withMessage('Nombre debe tener entre 2 y 50 caracteres'),
+    body('apellido').trim().isLength({ min: 2, max: 50 }).withMessage('Apellido debe tener entre 2 y 50 caracteres'),
+    body('nombre_usuario')
       .trim()
-      .isLength({ min: 2, max: 50 })
-      .withMessage('Nombre must be between 2 and 50 characters'),
-    body('apellido')
-      .trim()
-      .isLength({ min: 2, max: 50 })
-      .withMessage('Apellido must be between 2 and 50 characters'),
+      .isLength({ min: 3, max: 30 })
+      .withMessage('El usuario debe tener entre 3 y 30 caracteres')
+      .matches(/^[a-zA-Z0-9_]+$/)
+      .withMessage('Solo letras, números y guión bajo (_)'),
     body('correo')
+      .optional({ checkFalsy: true })
       .isEmail()
       .normalizeEmail()
-      .withMessage('Please provide a valid email'),
+      .withMessage('Correo inválido'),
     body('password')
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters long')
@@ -442,10 +454,9 @@ module.exports = {
       .withMessage('La contraseña debe contener al menos una letra mayúscula, una minúscula, y un número')
   ],
   validateLogin: [
-    body('correo')
-      .isEmail()
-      .normalizeEmail()
-      .withMessage('Please provide a valid email'),
+    body('identifier')
+      .notEmpty()
+      .withMessage('Ingresa tu correo o nombre de usuario'),
     body('password')
       .notEmpty()
       .withMessage('Password is required')

@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import Navbar from '../components/layout/Navbar.vue'
 import { getAllBusinesses, getPendingBusinesses, updateBusinessStatus, getAllUsers, updateUserRole, deleteBusinessById } from '../services/businessService'
 import { useAuthStore } from '../stores/auth'
+import api from '../services/api'
 
 // Import Modals
 import EditBusinessModal from '../components/admin/EditBusinessModal.vue'
@@ -20,6 +21,63 @@ const showToast = (message, type = 'success') => {
 const activeTab = ref('requests')
 const pendingRequests = ref([])
 const allBusinesses = ref([])
+
+// ── Categorías ──────────────────────────────────────────
+const allCategories = ref([])
+const catForm = ref({ nombre: '', descripcion: '' })
+const editingCat = ref(null)
+const showCatForm = ref(false)
+const savingCat = ref(false)
+const generatingCatDesc = ref(false)
+
+const generateCategoryDescription = async () => {
+  if (!catForm.value.nombre?.trim() || generatingCatDesc.value) return
+  generatingCatDesc.value = true
+  try {
+    const res = await api.post('/ai/generate-description', {
+      nombre: catForm.value.nombre,
+      tipo: 'categoría de negocio'
+    })
+    if (res.data?.descripcion) catForm.value.descripcion = res.data.descripcion
+  } catch { /* silent */ } finally { generatingCatDesc.value = false }
+}
+
+const fetchCategories = async () => {
+  const res = await api.get('/categories')
+  allCategories.value = res.data?.data || []
+}
+const openNewCat = () => {
+  editingCat.value = null
+  catForm.value = { nombre: '', descripcion: '' }
+  showCatForm.value = true
+}
+const openEditCat = (cat) => {
+  editingCat.value = cat
+  catForm.value = { nombre: cat.nombre, descripcion: cat.descripcion || '' }
+  showCatForm.value = true
+}
+const saveCat = async () => {
+  if (!catForm.value.nombre.trim()) return
+  savingCat.value = true
+  try {
+    if (editingCat.value) {
+      await api.put(`/categories/${editingCat.value.id_categoria}`, catForm.value)
+      showToast('Categoría actualizada')
+    } else {
+      await api.post('/categories', { ...catForm.value, activo: true })
+      showToast('Categoría creada')
+    }
+    showCatForm.value = false
+    await fetchCategories()
+  } catch { showToast('Error al guardar', 'error') } finally { savingCat.value = false }
+}
+const toggleCatActive = async (cat) => {
+  try {
+    await api.put(`/categories/${cat.id_categoria}`, { activo: !cat.activo })
+    cat.activo = !cat.activo
+    showToast(cat.activo ? 'Activada' : 'Desactivada')
+  } catch { showToast('Error', 'error') }
+}
 const allUsers = ref([])
 const loading = ref(false)
 const businessFilter = ref('todos')
@@ -70,7 +128,9 @@ const fetchData = async () => {
 
 const switchTab = (tabName) => {
   activeTab.value = tabName
-  if (tabName === 'requests' && pendingRequests.value.length === 0) {
+  if (tabName === 'categories' && allCategories.value.length === 0) {
+    fetchCategories()
+  } else if (tabName === 'requests' && pendingRequests.value.length === 0) {
     fetchData()
   } else if (tabName === 'businesses' && allBusinesses.value.length === 0) {
     fetchData()
@@ -241,6 +301,7 @@ onMounted(fetchData)
             <button @click="switchTab('requests')" :class="[activeTab === 'requests' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Solicitudes</button>
             <button @click="switchTab('businesses')" :class="[activeTab === 'businesses' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Negocios</button>
             <button @click="switchTab('users')" :class="[activeTab === 'users' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Usuarios</button>
+            <button @click="switchTab('categories')" :class="[activeTab === 'categories' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Categorías</button>
           </div>
           <button @click="fetchData()" :disabled="loading" title="Recargar datos de la pestaña actual" class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 text-fiery-navy hover:bg-slate-50 transition-colors shrink-0 disabled:opacity-50">
             <svg :class="['w-5 h-5', loading ? 'animate-spin' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -595,6 +656,72 @@ onMounted(fetchData)
           </div>
           </div>
         </div>
+
+        <!-- ── Tab: Categorías ── -->
+        <div v-if="activeTab === 'categories'" class="space-y-6">
+
+          <!-- Header -->
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest">Gestión de Categorías</h3>
+            <button v-if="!showCatForm" @click="openNewCat"
+              class="bg-fiery-navy text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity">
+              + Nueva categoría
+            </button>
+          </div>
+
+          <!-- Formulario inline -->
+          <div v-if="showCatForm" class="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-sm">
+            <h4 class="text-xs font-black text-fiery-navy uppercase">{{ editingCat ? 'Editar Categoría' : 'Nueva Categoría' }}</h4>
+            <input v-model="catForm.nombre" placeholder="Nombre *" type="text"
+              class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
+            <div class="relative">
+              <input v-model="catForm.descripcion" placeholder="Descripción (opcional)" type="text"
+                class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 pr-36 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy" />
+              <button type="button" @click="generateCategoryDescription"
+                :disabled="!catForm.nombre?.trim() || generatingCatDesc"
+                class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                <svg v-if="generatingCatDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                <span v-else>✦</span>
+                {{ generatingCatDesc ? 'Generando...' : 'Generar con IA' }}
+              </button>
+            </div>
+            <div class="flex gap-3 justify-end">
+              <button @click="showCatForm = false" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
+              <button @click="saveCat" :disabled="savingCat || !catForm.nombre?.trim()"
+                class="bg-fiery-navy text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-80 disabled:opacity-50 transition-opacity">
+                {{ savingCat ? 'Guardando...' : 'Guardar' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Lista -->
+          <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+            <div v-for="cat in allCategories" :key="cat.id_categoria"
+              class="flex items-center gap-4 px-6 py-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+              <div class="flex-1 min-w-0">
+                <p class="font-black text-fiery-navy text-sm">{{ cat.nombre }}</p>
+                <p v-if="cat.descripcion" class="text-slate-400 text-xs mt-0.5 truncate">{{ cat.descripcion }}</p>
+              </div>
+              <span :class="['text-[9px] font-black uppercase px-2.5 py-1 rounded-full', cat.activo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400']">
+                {{ cat.activo ? 'Activa' : 'Inactiva' }}
+              </span>
+              <div class="flex gap-2 shrink-0">
+                <button @click="openEditCat(cat)" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-500 hover:text-fiery-navy transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button @click="toggleCatActive(cat)"
+                  :class="['p-2 rounded-xl transition-colors text-xs font-black', cat.activo ? 'bg-red-50 text-fiery-red hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100']"
+                  :title="cat.activo ? 'Desactivar' : 'Activar'">
+                  {{ cat.activo ? '✕' : '✓' }}
+                </button>
+              </div>
+            </div>
+            <div v-if="allCategories.length === 0" class="text-center py-12 text-slate-400 text-sm font-bold">
+              Sin categorías aún
+            </div>
+          </div>
+        </div>
+
       </div>
     </main>
 

@@ -1,10 +1,10 @@
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
 import Navbar from '../components/layout/Navbar.vue'
-import arcoAntigua from '@/assets/fontabella.webp'
-import umgLogo from '@/assets/UMG.png'
-import paisaje from '@/assets/alfombra.webp'
-import mercado from '@/assets/mercado.webp'
+const arcoAntigua = 'https://pymesadmin.blob.core.windows.net/imagenes/300c2ed6-a53e-4408-8236-696268bea641.webp'
+const umgLogo    = 'https://pymesadmin.blob.core.windows.net/logos/69d3cbd2-5a09-4789-90e6-3cf13e3d337a.png'
+const paisaje    = 'https://pymesadmin.blob.core.windows.net/imagenes/873fd30a-d0f8-456e-9904-87c025e5dbcc.webp'
+const mercado    = 'https://pymesadmin.blob.core.windows.net/imagenes/ceddbb77-1156-4612-bc54-41c987af4222.webp'
 
 onMounted(() => {
   const observer = new IntersectionObserver((entries) => {

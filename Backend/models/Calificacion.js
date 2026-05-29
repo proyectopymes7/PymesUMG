@@ -21,9 +21,9 @@ class Calificacion {
     static async findByEmprendimiento(id_emprendimiento) {
         const query = `
             SELECT c.*,
-                u.nombre as usuario_nombre, u.apellido as usuario_apellido
-            fROM CALIFICACIONES c
-            Left JOIN USUARIOS u ON c.id_usuario = u.id_usuario
+                u.nombre as usuario_nombre, u.apellido as usuario_apellido, u.foto_perfil as usuario_foto
+            FROM CALIFICACIONES c
+            LEFT JOIN Usuarios u ON c.id_usuario = u.id_usuario
             WHERE c.id_emprendimiento = @id_emprendimiento
             ORDER BY c.fecha_calificacion DESC
         `;
@@ -31,6 +31,13 @@ class Calificacion {
         const params = [{ name: 'id_emprendimiento', value: id_emprendimiento, type: sql.Int }];
         const result = await executeQuery(query, params);
         return result;
+    }
+
+    static async findById(id) {
+        const query = `SELECT * FROM CALIFICACIONES WHERE id_calificacion = @id_calificacion`;
+        const params = [{ name: 'id_calificacion', value: id, type: sql.Int }];
+        const result = await executeQuery(query, params);
+        return result[0];
     }
 
     static async delete(id) {

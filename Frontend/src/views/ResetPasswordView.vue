@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
@@ -24,15 +24,15 @@ onMounted(() => {
 const handleReset = async () => {
   error.value = ''
   if (!newPassword.value || newPassword.value.length < 8) {
-    error.value = 'La contraseña debe tener al menos 8 caracteres'
+    error.value = 'La contraseÃ±a debe tener al menos 8 caracteres'
     return
   }
   if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword.value)) {
-    error.value = 'Debe tener mayúscula, minúscula y número'
+    error.value = 'Debe tener mayÃºscula, minÃºscula y nÃºmero'
     return
   }
   if (newPassword.value !== confirmPassword.value) {
-    error.value = 'Las contraseñas no coinciden'
+    error.value = 'Las contraseÃ±as no coinciden'
     return
   }
   loading.value = true
@@ -40,7 +40,7 @@ const handleReset = async () => {
     await api.post('/auth/reset-password', { token: token.value, newPassword: newPassword.value })
     success.value = true
   } catch (e) {
-    error.value = e.response?.data?.error || 'El enlace es inválido o ha expirado'
+    error.value = e.response?.data?.error || 'El enlace es invÃ¡lido o ha expirado'
   } finally {
     loading.value = false
   }
@@ -50,7 +50,7 @@ const handleReset = async () => {
 <template>
   <div class="relative min-h-screen">
     <div class="fixed inset-0 z-0"
-      style="background-image:url('/src/assets/AntiguaVolcan.webp');background-size:cover;background-position:center;">
+      style="background-image:url('https://pymesadmin.blob.core.windows.net/imagenes/4605ae9d-4213-4df7-abe7-f3f1fb86c21c.webp');background-size:cover;background-position:center;">
       <div class="absolute inset-0 bg-black/50"></div>
     </div>
 
@@ -58,31 +58,31 @@ const handleReset = async () => {
       <div class="w-full max-w-md">
         <div class="bg-white rounded-[2rem] shadow-2xl p-8 md:p-10">
 
-          <!-- Token inválido -->
+          <!-- Token invÃ¡lido -->
           <div v-if="tokenInvalid" class="text-center space-y-4">
             <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
               <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
               </svg>
             </div>
-            <h2 class="text-xl font-black text-fiery-navy uppercase">Enlace inválido</h2>
-            <p class="text-slate-500 text-sm">Este enlace de recuperación no es válido o ya expiró.</p>
+            <h2 class="text-xl font-black text-fiery-navy uppercase">Enlace invÃ¡lido</h2>
+            <p class="text-slate-500 text-sm">Este enlace de recuperaciÃ³n no es vÃ¡lido o ya expirÃ³.</p>
             <button @click="router.push('/login')" class="w-full bg-fiery-red text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fiery-darkred transition-all mt-2">
-              Ir al inicio de sesión
+              Ir al inicio de sesiÃ³n
             </button>
           </div>
 
-          <!-- Éxito -->
+          <!-- Ã‰xito -->
           <div v-else-if="success" class="text-center space-y-4">
             <div class="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
               <svg class="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
               </svg>
             </div>
-            <h2 class="text-xl font-black text-fiery-navy uppercase">¡Contraseña actualizada!</h2>
-            <p class="text-slate-500 text-sm">Tu contraseña fue cambiada correctamente. Ya puedes iniciar sesión.</p>
+            <h2 class="text-xl font-black text-fiery-navy uppercase">Â¡ContraseÃ±a actualizada!</h2>
+            <p class="text-slate-500 text-sm">Tu contraseÃ±a fue cambiada correctamente. Ya puedes iniciar sesiÃ³n.</p>
             <button @click="router.push('/login')" class="w-full bg-fiery-red text-white py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-fiery-darkred transition-all mt-2">
-              Iniciar Sesión
+              Iniciar SesiÃ³n
             </button>
           </div>
 
@@ -94,8 +94,8 @@ const handleReset = async () => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
                 </svg>
               </div>
-              <h1 class="text-2xl font-black text-fiery-navy uppercase tracking-tight mb-1">Nueva <span class="text-fiery-red">Contraseña</span></h1>
-              <p class="text-slate-500 text-sm">Ingresa tu nueva contraseña</p>
+              <h1 class="text-2xl font-black text-fiery-navy uppercase tracking-tight mb-1">Nueva <span class="text-fiery-red">ContraseÃ±a</span></h1>
+              <p class="text-slate-500 text-sm">Ingresa tu nueva contraseÃ±a</p>
             </div>
 
             <div v-if="error" class="p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3">
@@ -106,25 +106,25 @@ const handleReset = async () => {
             </div>
 
             <div>
-              <label class="block text-xs font-black text-fiery-navy uppercase tracking-wider mb-2">Nueva Contraseña</label>
+              <label class="block text-xs font-black text-fiery-navy uppercase tracking-wider mb-2">Nueva ContraseÃ±a</label>
               <div class="relative">
                 <input v-model="newPassword" :type="showNew ? 'text' : 'password'"
                   class="w-full bg-slate-50 border border-slate-200 text-fiery-navy rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-fiery-red/20 focus:border-fiery-red transition-all font-medium pr-12"
-                  placeholder="••••••••" />
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" />
                 <button type="button" @click="showNew = !showNew" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-fiery-navy">
                   <svg v-if="showNew" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
                   <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                 </button>
               </div>
-              <p class="text-[10px] text-slate-400 mt-1">Mínimo 8 caracteres, una mayúscula, una minúscula y un número</p>
+              <p class="text-[10px] text-slate-400 mt-1">MÃ­nimo 8 caracteres, una mayÃºscula, una minÃºscula y un nÃºmero</p>
             </div>
 
             <div>
-              <label class="block text-xs font-black text-fiery-navy uppercase tracking-wider mb-2">Confirmar Contraseña</label>
+              <label class="block text-xs font-black text-fiery-navy uppercase tracking-wider mb-2">Confirmar ContraseÃ±a</label>
               <div class="relative">
                 <input v-model="confirmPassword" :type="showConfirm ? 'text' : 'password'"
                   class="w-full bg-slate-50 border border-slate-200 text-fiery-navy rounded-2xl px-5 py-4 focus:outline-none focus:ring-2 focus:ring-fiery-red/20 focus:border-fiery-red transition-all font-medium pr-12"
-                  placeholder="••••••••" @keyup.enter="handleReset" />
+                  placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" @keyup.enter="handleReset" />
                 <button type="button" @click="showConfirm = !showConfirm" class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-fiery-navy">
                   <svg v-if="showConfirm" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
                   <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
@@ -138,7 +138,7 @@ const handleReset = async () => {
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
               </svg>
-              <span v-else>Guardar Nueva Contraseña</span>
+              <span v-else>Guardar Nueva ContraseÃ±a</span>
             </button>
           </div>
 

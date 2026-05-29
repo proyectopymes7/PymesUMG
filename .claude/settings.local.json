@@ -9,7 +9,8 @@
       "Bash(npm install *)",
       "Bash(netstat -ano)",
       "Bash(npm start *)",
-      "Bash(curl -s http://localhost:3000/health)"
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(node -e \"require\\('nodemailer'\\); console.log\\('nodemailer ok'\\)\")"
     ]
   }
 }

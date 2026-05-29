@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import { useAuthStore } from '../stores/auth'
-import { getRawCategories, uploadProductImage } from '../services/businessService'
+import { getRawCategories, uploadImage, uploadProductImage } from '../services/businessService'
 import api from '../services/api'
 
 const router = useRouter()
@@ -26,6 +26,7 @@ const totalSteps = 3
 const submitting = ref(false)
 const categories = ref([])
 const selectedCategorias = ref([])
+const showCategoryDropdown = ref(false)
 
 // ── Foto del negocio (opcional) ─────────────────────────
 const businessImageFile = ref(null)
@@ -96,6 +97,45 @@ const showProductForm = ref(false)
 const editingProduct = ref(null)
 const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '', visibilidad_precio: 'VISIBLE' })
 const productImageFiles = ref([]) // [{ file, preview }]
+const generatingDesc = ref(false)
+const generatingBizDesc = ref(false)
+
+const generateBusinessDescription = async () => {
+  if (!form.value.nombre?.trim() || generatingBizDesc.value) return
+  generatingBizDesc.value = true
+  try {
+    const categoria = categories.value.find(c => selectedCategorias.value.includes(c.id_categoria))?.nombre || ''
+    const loc = [form.value.locationData?.municipio, form.value.locationData?.departamento].filter(Boolean).join(', ')
+    const res = await api.post('/ai/generate-description', {
+      nombre: form.value.nombre,
+      tipo: 'negocio',
+      nombre_negocio: form.value.nombre,
+      categoria,
+      ubicacion: loc,
+      horario: form.value.horario || ''
+    })
+    if (res.data?.descripcion) form.value.descripcion = res.data.descripcion
+  } catch { /* silent */ } finally {
+    generatingBizDesc.value = false
+  }
+}
+
+const generateProductDescription = async () => {
+  if (!productForm.value.nombre?.trim() || generatingDesc.value) return
+  generatingDesc.value = true
+  try {
+    const res = await api.post('/ai/generate-description', {
+      nombre: productForm.value.nombre,
+      tipo: productForm.value.tipo,
+      nombre_negocio: form.value.nombre
+    })
+    if (res.data?.descripcion) productForm.value.descripcion = res.data.descripcion
+  } catch {
+    // silently fail
+  } finally {
+    generatingDesc.value = false
+  }
+}
 const fileInputRef = ref(null)
 const deletingId = ref(null)
 
@@ -231,14 +271,11 @@ const submitRequest = async () => {
     const res = await api.post('/emprendimientos', payload)
     const newId = res.data?.data?.id_emprendimiento
 
-    // 2. Subir foto del negocio si hay
+    // 2. Subir foto del negocio si hay (comprimida y como logo)
     if (newId && businessImageFile.value) {
       try {
-        const fd = new FormData()
-        fd.append('imagen', businessImageFile.value)
-        await api.post(`/imagenes/emprendimiento/${newId}`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
+        const logoUrl = await uploadImage(businessImageFile.value, 'logos')
+        await api.put(`/emprendimientos/${newId}`, { logo_url: logoUrl })
       } catch (imgErr) {
         console.warn('No se pudo subir la foto del negocio:', imgErr)
       }
@@ -341,7 +378,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
       </div>
 
       <!-- ═══ STEP 1: Información general ═══ -->
-      <div v-if="currentStep === 1" class="space-y-5">
+      <transition name="step-fade" mode="out-in">
+      <div v-if="currentStep === 1" key="step1" class="space-y-5">
 
         <!-- Foto del negocio (opcional) -->
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
@@ -397,7 +435,16 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           </div>
 
           <div>
-            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Descripción *</label>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest">Descripción *</label>
+              <button type="button" @click="generateBusinessDescription"
+                :disabled="!form.nombre?.trim() || generatingBizDesc"
+                class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                <svg v-if="generatingBizDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                <span v-else>✦</span>
+                {{ generatingBizDesc ? 'Generando...' : 'Generar con IA' }}
+              </button>
+            </div>
             <textarea
               v-model="form.descripcion" rows="4" maxlength="1000"
               placeholder="Describe tu negocio, qué ofreces, quiénes son, etc. (mín. 10 caracteres)"
@@ -409,28 +456,36 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             </div>
           </div>
 
-          <!-- Categorías -->
-          <div>
+          <!-- Categorías dropdown -->
+          <div class="relative">
             <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-              Categoría * <span class="text-slate-300 font-normal normal-case">(mín. 1, máx. 3)</span>
+              Categoría * <span class="text-slate-300 font-normal normal-case">(máx. 3)</span>
             </label>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <button
-                v-for="cat in categories" :key="cat.id_categoria"
-                type="button"
+            <!-- Chips seleccionadas + trigger -->
+            <button type="button" @click="showCategoryDropdown = !showCategoryDropdown"
+              class="w-full min-h-[48px] border border-slate-200 bg-white rounded-xl px-4 py-2 flex items-center flex-wrap gap-2 text-left focus:outline-none focus:border-fiery-navy transition-all">
+              <span v-if="selectedCategorias.length === 0" class="text-slate-400 text-sm font-medium">Selecciona categorías...</span>
+              <span v-for="id in selectedCategorias" :key="id"
+                class="inline-flex items-center gap-1 bg-fiery-navy text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+                {{ categories.find(c => c.id_categoria === id)?.nombre }}
+                <button type="button" @click.stop="selectedCategorias.splice(selectedCategorias.indexOf(id), 1)"
+                  class="hover:text-white/60 transition-colors leading-none">×</button>
+              </span>
+              <svg class="w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform" :class="showCategoryDropdown ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </button>
+            <!-- Dropdown list -->
+            <div v-if="showCategoryDropdown" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+              <button v-for="cat in categories" :key="cat.id_categoria" type="button"
                 :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
                 @click="selectedCategorias.includes(cat.id_categoria)
                   ? selectedCategorias.splice(selectedCategorias.indexOf(cat.id_categoria), 1)
-                  : selectedCategorias.push(cat.id_categoria)"
-                :class="[
-                  'px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all border text-left',
-                  selectedCategorias.includes(cat.id_categoria)
-                    ? 'bg-fiery-navy text-white border-fiery-navy'
-                    : 'bg-white text-slate-500 border-slate-200 hover:border-fiery-red hover:text-fiery-red',
-                  (!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3)
-                    ? 'opacity-40 cursor-not-allowed' : ''
-                ]"
-              >{{ cat.nombre }}</button>
+                  : (selectedCategorias.length < 3 && selectedCategorias.push(cat.id_categoria))"
+                class="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-b border-slate-50 last:border-0">
+                <span :class="['w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors', selectedCategorias.includes(cat.id_categoria) ? 'bg-fiery-navy border-fiery-navy' : 'border-slate-300']">
+                  <svg v-if="selectedCategorias.includes(cat.id_categoria)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                </span>
+                <span class="font-bold text-fiery-navy">{{ cat.nombre }}</span>
+              </button>
             </div>
             <p v-if="errors.categorias" class="text-[10px] text-red-500 font-bold mt-1">{{ errors.categorias }}</p>
           </div>
@@ -465,9 +520,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           </div>
         </div>
       </div>
+      </transition>
 
       <!-- ═══ STEP 2: Ubicación y horario ═══ -->
-      <div v-if="currentStep === 2" class="space-y-5">
+      <transition name="step-fade" mode="out-in">
+      <div v-if="currentStep === 2" key="step2" class="space-y-5">
 
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Ubicación del Negocio</p>
@@ -502,9 +559,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
           </div>
         </div>
       </div>
+      </transition>
 
       <!-- ═══ STEP 3: Productos/Servicios ═══ -->
-      <div v-if="currentStep === 3" class="space-y-5">
+      <transition name="step-fade" mode="out-in">
+      <div v-if="currentStep === 3" key="step3" class="space-y-5">
         <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
           <div class="flex justify-between items-center mb-4">
             <div>
@@ -532,8 +591,22 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             </div>
             <input v-model="productForm.nombre" placeholder="Nombre *" type="text"
               class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
-            <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
-              class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+            <div class="relative">
+              <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
+                class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 pr-24 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+              <button
+                type="button"
+                @click="generateProductDescription"
+                :disabled="!productForm.nombre?.trim() || generatingDesc"
+                class="absolute right-2 top-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                :class="generatingDesc ? 'bg-slate-100 text-slate-400' : 'bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white'"
+                title="Generar descripción con IA"
+              >
+                <svg v-if="generatingDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                <span v-else>✦</span>
+                {{ generatingDesc ? 'Generando...' : 'Generar con IA' }}
+              </button>
+            </div>
 
             <!-- Precio y visibilidad -->
             <div class="flex gap-2">
@@ -550,27 +623,29 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               </select>
             </div>
 
-            <!-- Múltiples imágenes -->
-            <input type="file" ref="fileInputRef" accept="image/*" multiple class="hidden" @change="handleProductImageChange" />
-            <div v-if="productImageFiles.length > 0" class="grid grid-cols-3 gap-2">
-              <div v-for="(item, idx) in productImageFiles" :key="idx" class="relative group h-20">
-                <img :src="item.preview" class="w-full h-full object-cover rounded-xl" />
-                <button @click.stop="removeProductImage(idx)"
-                  class="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow">×</button>
+            <!-- Imágenes (solo para productos) -->
+            <template v-if="productForm.tipo === 'producto'">
+              <input type="file" ref="fileInputRef" accept="image/*" multiple class="hidden" @change="handleProductImageChange" />
+              <div v-if="productImageFiles.length > 0" class="grid grid-cols-3 gap-2">
+                <div v-for="(item, idx) in productImageFiles" :key="idx" class="relative group h-20">
+                  <img :src="item.preview" class="w-full h-full object-cover rounded-xl" />
+                  <button @click.stop="removeProductImage(idx)"
+                    class="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow">×</button>
+                </div>
+                <div @click="triggerFileInput"
+                  class="h-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-fiery-navy transition-colors">
+                  <span class="text-2xl text-slate-300 leading-none">+</span>
+                </div>
               </div>
-              <div @click="triggerFileInput"
-                class="h-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-fiery-navy transition-colors">
-                <span class="text-2xl text-slate-300 leading-none">+</span>
+              <div v-else @click="triggerFileInput"
+                class="w-full h-[110px] rounded-xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-50 transition-colors">
+                <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                <span class="text-xs font-bold text-slate-400">Agregar imágenes (opcional)</span>
+                <span class="text-[10px] text-slate-300 mt-0.5">Puedes seleccionar varias</span>
               </div>
-            </div>
-            <div v-else @click="triggerFileInput"
-              class="w-full h-[110px] rounded-xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-50 transition-colors">
-              <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-              </svg>
-              <span class="text-xs font-bold text-slate-400">Agregar imágenes (opcional)</span>
-              <span class="text-[10px] text-slate-300 mt-0.5">Puedes seleccionar varias</span>
-            </div>
+            </template>
 
             <div class="flex gap-3 justify-end pt-1">
               <button @click="showProductForm = false" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
@@ -639,6 +714,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
         </div>
       </div>
 
+      </transition>
+
       <!-- Navegación entre steps -->
       <div class="flex flex-col sm:flex-row gap-3 mt-8" :class="currentStep > 1 ? 'justify-between' : 'justify-end'">
         <button v-if="currentStep > 1" @click="prevStep"
@@ -667,4 +744,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
 .toast-enter-active, .toast-leave-active { transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
 .toast-enter-from { opacity: 0; transform: translateX(110%); }
 .toast-leave-to   { opacity: 0; transform: translateX(110%); }
+
+/* Transición suave entre pasos */
+.step-fade-enter-active { transition: opacity 0.35s ease, transform 0.35s ease; }
+.step-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+.step-fade-enter-from   { opacity: 0; transform: translateY(12px); }
+.step-fade-leave-to     { opacity: 0; transform: translateY(-8px); }
 </style>

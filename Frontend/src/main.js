@@ -1,3 +1,7 @@
+// Evitar restauración de scroll del browser y forzar tope al recargar
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
+window.addEventListener('load', () => window.scrollTo(0, 0), { once: true })
+
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import vue3GoogleLogin from 'vue3-google-login'
