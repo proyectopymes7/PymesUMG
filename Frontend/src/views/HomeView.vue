@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
 const alfombra = 'https://pymesadmin.blob.core.windows.net/imagenes/873fd30a-d0f8-456e-9904-87c025e5dbcc.webp'
-import { getFeaturedBusinesses, getCategories, getNearbyBusinesses } from '../services/businessService'
+import { getCategories, getNearbyBusinesses, getTopRatedBusinesses } from '../services/businessService'
 
 const router = useRouter()
 
@@ -138,10 +138,11 @@ const handleTouchEnd = (e) => {
 onMounted(async () => {
   requestLocation()
   try {
-    featuredBusinesses.value = await getFeaturedBusinesses(5)
+    featuredBusinesses.value = await getTopRatedBusinesses(5)
   } catch (err) {
     console.error('Error fetching featured businesses:', err)
   }
+
 
   try {
     const cats = await getCategories()
@@ -195,9 +196,14 @@ onUnmounted(() => {
             Descubre<br/>
             <span class="text-fiery-red">Negocios cerca</span>
           </h1>
-          <p class="text-cream-muted text-lg md:text-xl max-w-xl mb-10 leading-relaxed font-light">
+          <p class="text-cream-muted text-lg md:text-xl max-w-xl mb-8 leading-relaxed font-light">
             Encuentra los mejores negocios, servicios y productos cerca de ti. Apoya a los emprendedores y descubre lo que tu ciudad tiene para ofrecer.
           </p>
+          <RouterLink to="/directorio"
+            class="inline-flex items-center gap-3 px-8 py-4 bg-fiery-red hover:bg-fiery-darkred text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl shadow-fiery-red/30 active:scale-95">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m7-7l-7 7 7 7"/></svg>
+            Explorar el Directorio
+          </RouterLink>
         </div>
         <div class="hidden lg:flex justify-end absolute right-0 bottom-[-230px] z-50 pointer-events-none w-[50%]">
           <img src="https://pymesadmin.blob.core.windows.net/imagenes/84f5d8ba-92a4-496e-9006-5bec387cd30f.png" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" />

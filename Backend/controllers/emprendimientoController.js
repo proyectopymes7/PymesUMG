@@ -63,7 +63,8 @@ const getEmprendimientos = async (req, res) => {
       estado: req.query.estado === 'ALL' ? undefined : (req.query.estado || 'activo'),
       destacado: req.query.destacado === 'true' ? 1 : req.query.destacado === 'false' ? 0 : undefined,
       limit: parseInt(req.query.limit) || 50,
-      offset: parseInt(req.query.offset) || 0
+      offset: parseInt(req.query.offset) || 0,
+      sort: req.query.sort
     };
 
     const emprendimientos = await Emprendimiento.findAll(filters);

@@ -133,7 +133,17 @@ class Emprendimiento {
       paramIndex++;
     }
 
-    query += ` ORDER BY e.fecha_registro DESC`;
+    if (filters.sort === 'rating') {
+      // Rated businesses first sorted by rating DESC, then unrated randomly
+      query += `
+        ORDER BY
+          CASE WHEN (SELECT AVG(puntuacion) FROM Calificaciones WHERE id_emprendimiento = e.id_emprendimiento) IS NULL THEN 1 ELSE 0 END ASC,
+          ISNULL((SELECT AVG(puntuacion) FROM Calificaciones WHERE id_emprendimiento = e.id_emprendimiento), 0) DESC,
+          NEWID()
+      `;
+    } else {
+      query += ` ORDER BY e.fecha_registro DESC`;
+    }
 
     if (filters.limit) {
       query += ` OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;

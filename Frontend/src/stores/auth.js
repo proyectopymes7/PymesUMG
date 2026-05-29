@@ -110,7 +110,10 @@ export const useAuthStore = defineStore('auth', {
         localStorage.setItem('user', JSON.stringify(this.user))
         return true
       } catch (err) {
-        this.logout()
+        // Solo logout si el token expiró (401), no por errores de red o API caída
+        if (err.response?.status === 401) {
+          this.logout()
+        }
         return false
       }
     },
