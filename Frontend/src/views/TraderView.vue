@@ -3,6 +3,7 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
+import ImageSuggestModal from '../components/shared/ImageSuggestModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage, uploadProductImage } from '../services/businessService'
 import api from '../services/api'
@@ -174,6 +175,19 @@ const deletingId = ref(null)
 const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
 const generatingDesc = ref(false)
 const generatingBizDesc = ref(false)
+const showBizImageSuggest = ref(false)
+const showProdImageSuggest = ref(false)
+const prodImageSuggestedUrl = ref(null)
+
+const onBizImageSuggested = async (url) => {
+  logoPreview.value = url
+  logoFile.value = null
+  try {
+    await updateBusinessData(business.value.id, { logo_url: url })
+    business.value = { ...business.value, logo: url, image: url }
+    showToast('Foto actualizada')
+  } catch { showToast('Error al guardar la imagen', 'error') }
+}
 
 const generateBusinessDescription = async () => {
   if (!business.value?.name?.trim() || generatingBizDesc.value) return
@@ -226,6 +240,7 @@ const openNewProduct = () => {
   productForm.value = { tipo: 'producto', nombre: '', descripcion: '', precio: '' }
   productImageFile.value = null
   productImagePreview.value = null
+  prodImageSuggestedUrl.value = null
   showProductForm.value = true
 }
 
@@ -265,6 +280,12 @@ const saveProduct = async () => {
         productImagePreview.value = imgUrl
         productImageFile.value = null
       } catch (e) { showToast('Guardado, pero falló la imagen', 'error') }
+    } else if (prodImageSuggestedUrl.value && savedId) {
+      // Imagen viene de sugerencias IA — guardar URL directamente en IMAGENES_PRODUCTO
+      try {
+        await api.post(`/imagenes/producto/${savedId}/url`, { url: prodImageSuggestedUrl.value })
+        prodImageSuggestedUrl.value = null
+      } catch (e) { showToast('Guardado, pero falló la imagen de IA', 'error') }
     }
     showToast(editingProduct.value ? 'Producto actualizado' : 'Producto creado')
     showProductForm.value = false
@@ -465,29 +486,29 @@ const saveGeneral = async () => {
 
       <!-- Header con logo del negocio -->
       <div class="mb-8 flex flex-col sm:flex-row items-center sm:items-end gap-5">
-        <!-- Logo editable — toda el área es clickeable -->
-        <div class="relative group flex-shrink-0 cursor-pointer" @click="logoInputRef?.click()">
-          <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-slate-100">
-            <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-cover" />
-            <div v-else class="w-full h-full flex items-center justify-center bg-fiery-navy text-white font-black text-4xl uppercase">
-              {{ business.name?.charAt(0) || '?' }}
+        <!-- Logo editable -->
+        <div class="flex-shrink-0 flex flex-col items-center gap-2">
+          <div class="relative cursor-pointer" @click="logoInputRef?.click()">
+            <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-slate-100">
+              <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-cover" />
+              <div v-else class="w-full h-full flex items-center justify-center bg-fiery-navy text-white font-black text-4xl uppercase">
+                {{ business.name?.charAt(0) || '?' }}
+              </div>
             </div>
-            <!-- Overlay al hover -->
-            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-3xl">
-              <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-              </svg>
-            </div>
-          </div>
-          <!-- Botón cámara pequeño en esquina -->
-          <div class="absolute bottom-0 right-0 w-8 h-8 bg-fiery-red text-white rounded-full flex items-center justify-center shadow-md pointer-events-none">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
           </div>
           <input ref="logoInputRef" type="file" accept="image/*" class="hidden" @change="handleLogoChange" />
+          <!-- Botones de foto -->
+          <div class="flex gap-2">
+            <button type="button" @click="logoInputRef?.click()"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Foto
+            </button>
+            <button type="button" @click="showBizImageSuggest = true"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+              ✦ IA
+            </button>
+          </div>
         </div>
         <div class="text-center sm:text-left">
           <h4 class="text-fiery-red font-black uppercase tracking-[0.3em] text-xs mb-1">Mi Negocio</h4>
@@ -726,6 +747,14 @@ const saveGeneral = async () => {
               </svg>
               <span class="text-xs font-bold text-slate-400">Agregar imagen (opcional)</span>
             </div>
+            <!-- Sugerir imagen con IA (dentro del bloque producto) -->
+            <div class="flex justify-center pt-1">
+              <button type="button" @click="showProdImageSuggest = true"
+                :disabled="!productForm.nombre?.trim()"
+                class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                ✦ Sugerir imagen con IA
+              </button>
+            </div>
           </template>
 
           <div class="flex gap-3 justify-end pt-1">
@@ -851,6 +880,26 @@ const saveGeneral = async () => {
     </transition>
 
   </div>
+
+  <!-- Modales de sugerencias IA -->
+  <ImageSuggestModal
+    :show="showBizImageSuggest"
+    :nombre="business?.name"
+    :categoria="business?.category"
+    :descripcion="business?.description"
+    :municipio="business?.muni"
+    :departamento="business?.dept"
+    @close="showBizImageSuggest = false"
+    @selected="onBizImageSuggested"
+  />
+  <ImageSuggestModal
+    :show="showProdImageSuggest"
+    :nombre="productForm.nombre"
+    :categoria="productForm.tipo"
+    :descripcion="productForm.descripcion"
+    @close="showProdImageSuggest = false"
+    @selected="(url) => { productImagePreview.value = url; prodImageSuggestedUrl.value = url; productImageFile.value = null; showProdImageSuggest = false }"
+  />
 </template>
 
 <style scoped>

@@ -113,6 +113,30 @@ router.post('/galeria/:id_emprendimiento', auth, upload.single('imagen'), async 
   }
 });
 
+// ─── POST: guardar URL de imagen de producto (desde sugerencias IA) ──────────
+
+router.post('/producto/:id_producto/url', auth, async (req, res) => {
+  try {
+    const { url } = req.body
+    if (!url) return res.status(400).json({ error: 'URL requerida' })
+
+    const pool = await connectDB()
+    const result = await pool.request()
+      .input('id_producto', sql.Int, req.params.id_producto)
+      .input('url', sql.VarChar(500), url)
+      .input('orden', sql.Int, 0)
+      .query(`
+        INSERT INTO IMAGENES_PRODUCTO (id_producto, url, orden)
+        VALUES (@id_producto, @url, @orden);
+        SELECT SCOPE_IDENTITY() AS id_imagen_producto;
+      `)
+
+    res.json({ success: true, id_imagen_producto: result.recordset[0].id_imagen_producto, url })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ─── POST: subir imagen de producto ──────────────────────────────────────────
 
 router.post('/producto/:id_producto', auth, upload.single('imagen'), async (req, res) => {
