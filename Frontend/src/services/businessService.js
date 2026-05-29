@@ -246,6 +246,19 @@ export const getBusinessReviews = async (businessId) => {
   }
 };
 
+export const getTopRatedBusinesses = async (limit = 20) => {
+  try {
+    const response = await api.get('/emprendimientos', { params: { sort: 'rating', limit } })
+    if (response.data.success && response.data.data) {
+      return response.data.data.map(mapBusinessData)
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching top rated businesses:', error)
+    return []
+  }
+}
+
 export const getNearbyBusinesses = async (lat, lng, radio = 10) => {
   try {
     const response = await api.get('/emprendimientos/nearby/list', { params: { lat, lng, radio, limit: 12 } })

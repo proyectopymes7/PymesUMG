@@ -123,7 +123,7 @@ const filteredBusinesses = computed(() => {
   return list
 })
 
-const toggleFilters = () => { if (!isDesktop.value) isFilterOpen.value = !isFilterOpen.value }
+const toggleFilters = () => { isFilterOpen.value = !isFilterOpen.value }
 
 const resetFilters = () => {
   searchKeyword.value = ''
@@ -164,23 +164,38 @@ onMounted(async () => {
     <div class="container mx-auto px-4 md:px-6 pt-32 pb-12">
 
       <!-- Header -->
-      <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-6">
-        <div>
-          <h1 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit">Nuestro <span class="text-fiery-red">Directorio</span></h1>
-          <p class="text-slate-500 font-medium mt-2">Explora los mejores negocios de toda Guatemala</p>
-        </div>
+      <div class="mb-8">
+        <h1 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit mb-1">Nuestro <span class="text-fiery-red">Directorio</span></h1>
+        <p class="text-slate-500 font-medium">Explora los mejores negocios de toda Guatemala</p>
       </div>
 
-
-      <div class="mb-4">
+      <!-- Barra de búsqueda principal + botón filtros -->
+      <div class="flex gap-3 mb-6">
+        <div class="relative flex-1">
+          <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input
+            v-model="searchKeyword"
+            type="text"
+            placeholder="Busca un negocio por nombre..."
+            class="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white text-fiery-navy font-bold outline-none focus:border-fiery-red transition-all shadow-sm text-sm"
+          />
+        </div>
         <button
-          v-if="!isDesktop"
           @click="toggleFilters"
           :class="[
-            'flex lg:hidden items-center gap-3 px-8 py-4 rounded-2xl font-black transition-all shadow-xl active:scale-95',
-            isFilterOpen ? 'bg-fiery-navy text-white shadow-fiery-navy/20' : 'bg-fiery-red text-white shadow-fiery-red/20'
+            'flex items-center gap-2 px-6 py-4 rounded-2xl font-black text-sm transition-all shadow-sm border whitespace-nowrap',
+            isFilterOpen
+              ? 'bg-fiery-navy text-white border-fiery-navy'
+              : 'bg-white text-fiery-navy border-slate-200 hover:border-fiery-navy'
           ]"
-        >{{ isFilterOpen ? 'Cerrar Buscador' : 'Busca negocios' }}</button>
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M7 8h10M11 12h4"/></svg>
+          Filtros
+          <span v-if="selectedCategories.length > 0 || selectedDept !== 'Todas' || sortBy !== 'default'"
+            class="bg-fiery-red text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+            {{ [selectedCategories.length > 0, selectedDept !== 'Todas', sortBy !== 'default'].filter(Boolean).length }}
+          </span>
+        </button>
       </div>
 
       <div class="flex flex-col lg:flex-row gap-8">
@@ -192,17 +207,6 @@ onMounted(async () => {
               <h2 class="text-sm font-black text-fiery-navy mb-6 uppercase tracking-widest">Filtros</h2>
 
               <div class="space-y-6">
-
-                <!-- Keyword -->
-                <div>
-                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">¿Qué buscas?</label>
-                  <input
-                    v-model="searchKeyword"
-                    type="text"
-                    placeholder="Nombre del negocio..."
-                    class="w-full px-6 py-4 rounded-2xl bg-white border border-slate-200 outline-none transition-all font-bold text-fiery-navy shadow-sm focus:border-fiery-red"
-                  />
-                </div>
 
                 <!-- Ubicación -->
                 <div class="space-y-4 pt-4 border-t border-slate-200">
