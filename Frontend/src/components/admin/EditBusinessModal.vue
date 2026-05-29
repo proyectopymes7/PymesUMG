@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { getRawCategories, uploadProductImage } from '../../services/businessService'
+import { getRawCategories, uploadProductImage, uploadImage } from '../../services/businessService'
 import api from '../../services/api'
 import LocationPicker from '../shared/LocationPicker.vue'
+import ImageSuggestModal from '../shared/ImageSuggestModal.vue'
 
 const props = defineProps({
   show: Boolean,
@@ -77,6 +78,24 @@ const newImageFiles = ref([]) // [{ file, preview }]
 const loadingImages = ref(false)
 const generatingDesc = ref(false)
 const generatingBizDesc = ref(false)
+const showBizImageSuggest = ref(false)
+const showProdImageSuggest = ref(false)
+
+const onBizImageSuggested = async (url) => {
+  try {
+    await api.put(`/emprendimientos/${props.business.id}`, { logo_url: url })
+    showToast('Foto del negocio actualizada')
+    emit('saved', { ...props.business, logo: url, image: url })
+  } catch { showToast('Error al guardar la imagen', 'error') }
+}
+
+const prodImageSuggestedUrl = ref(null)
+
+const onProdImageSuggested = (url) => {
+  prodImageSuggestedUrl.value = url
+  newImageFiles.value.push({ file: null, preview: url, url })
+  showToast('Imagen agregada — se guardará al hacer click en Guardar')
+}
 
 const generateBusinessDescription = async () => {
   if (!formData.value.name?.trim() || generatingBizDesc.value) return
@@ -380,9 +399,14 @@ const saveProduct = async () => {
 
     let imageFailed = false
     if (newImageFiles.value.length && savedProductId) {
-      for (const { file } of newImageFiles.value) {
+      for (const item of newImageFiles.value) {
         try {
-          await uploadProductImage(file, savedProductId)
+          if (item.file) {
+            await uploadProductImage(item.file, savedProductId)
+          } else if (item.url) {
+            // URL de sugerencia IA — guardar directamente
+            await api.post(`/imagenes/producto/${savedProductId}/url`, { url: item.url })
+          }
         } catch (imgError) {
           console.error('Error al subir imagen:', imgError)
           imageFailed = true
@@ -453,7 +477,8 @@ const executeDelete = async (id) => {
       </div>
 
       <!-- Content -->
-      <div class="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
+      <div class="flex-1 overflow-y-auto p-6 bg-slate-50" style="scrollbar-width:none;-ms-overflow-style:none;">
+
         
         <!-- Tab: Información General -->
         <div v-show="activeTab === 'general'" class="space-y-6">
@@ -466,13 +491,20 @@ const executeDelete = async (id) => {
             <div class="md:col-span-2">
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-xs font-black text-slate-400 uppercase tracking-widest">Descripción</label>
-                <button type="button" @click="generateBusinessDescription"
-                  :disabled="!formData.name?.trim() || generatingBizDesc"
-                  class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
-                  <svg v-if="generatingBizDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                  <span v-else>✦</span>
-                  {{ generatingBizDesc ? 'Generando...' : 'Generar con IA' }}
-                </button>
+                <div class="flex items-center gap-2">
+                  <button type="button" @click="showBizImageSuggest = true"
+                    :disabled="!formData.name?.trim()"
+                    class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                    ✦ Foto con IA
+                  </button>
+                  <button type="button" @click="generateBusinessDescription"
+                    :disabled="!formData.name?.trim() || generatingBizDesc"
+                    class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                    <svg v-if="generatingBizDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                    <span v-else>✦</span>
+                    {{ generatingBizDesc ? 'Generando...' : 'Descripción con IA' }}
+                  </button>
+                </div>
               </div>
               <textarea v-model="formData.description" rows="3" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-600 focus:outline-none focus:border-fiery-red transition-all"></textarea>
             </div>
@@ -487,6 +519,7 @@ const executeDelete = async (id) => {
                 Categorías <span class="text-slate-300 font-normal normal-case">(máx. 3)</span>
               </label>
               <button type="button" @click="categoryDropdownOpen = !categoryDropdownOpen"
+                @blur="setTimeout(() => { categoryDropdownOpen = false }, 150)"
                 class="w-full min-h-[44px] border border-slate-200 bg-white rounded-xl px-4 py-2 flex items-center flex-wrap gap-2 text-left focus:outline-none focus:border-fiery-red transition-all">
                 <span v-if="selectedCategorias.length === 0" class="text-slate-400 text-sm font-medium">Selecciona categorías...</span>
                 <span v-for="id in selectedCategorias" :key="id"
@@ -497,7 +530,7 @@ const executeDelete = async (id) => {
                 </span>
                 <svg class="w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform" :class="categoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
               </button>
-              <div v-if="categoryDropdownOpen" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+              <div v-if="categoryDropdownOpen" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto" @click.stop>
                 <button v-for="cat in categories" :key="cat.id_categoria" type="button"
                   :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
                   @click="selectedCategorias.includes(cat.id_categoria)
@@ -669,6 +702,15 @@ const executeDelete = async (id) => {
                 </div>
               </template>
 
+              <!-- Sugerir imagen con IA para el producto -->
+              <div class="flex justify-center pt-1">
+                <button type="button" @click="showProdImageSuggest = true"
+                  :disabled="!productForm.nombre?.trim()"
+                  class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                  ✦ Sugerir imagen con IA
+                </button>
+              </div>
+
               <div class="flex gap-3 justify-end pt-2">
                 <button @click="showProductForm = false" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
                 <button @click="saveProduct" :disabled="loadingProducts" class="bg-fiery-navy hover:bg-slate-800 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-lg disabled:opacity-50">Guardar</button>
@@ -740,6 +782,24 @@ const executeDelete = async (id) => {
 
     </div>
 
+    <!-- Modales IA -->
+    <ImageSuggestModal
+      :show="showBizImageSuggest"
+      :nombre="formData.name"
+      :categoria="categories.find(c => selectedCategorias.includes(c.id_categoria))?.nombre"
+      :descripcion="formData.description"
+      @close="showBizImageSuggest = false"
+      @selected="onBizImageSuggested"
+    />
+    <ImageSuggestModal
+      :show="showProdImageSuggest"
+      :nombre="productForm.nombre"
+      :categoria="productForm.tipo"
+      :descripcion="productForm.descripcion"
+      @close="showProdImageSuggest = false"
+      @selected="onProdImageSuggested"
+    />
+
     <!-- Local Toast Container -->
     <div class="fixed bottom-6 right-6 z-[200] flex flex-col gap-3 pointer-events-none">
       <TransitionGroup name="toast">
@@ -763,16 +823,9 @@ const executeDelete = async (id) => {
 </template>
 
 <style scoped>
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 10px;
+.custom-scrollbar::-webkit-scrollbar { display: none; }
+.custom-scrollbar::-webkit-scrollbar-track { display: none; }
+.custom-scrollbar::-webkit-scrollbar-thumb { display: none;
 }
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out;

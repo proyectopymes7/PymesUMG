@@ -17,6 +17,8 @@ const {
 // Public routes
 router.get('/', optionalAuth, getEmprendimientos);
 router.get('/search', searchRateLimiterMiddleware, optionalAuth, searchEmprendimientos);
+// Rutas específicas ANTES de /:id para que no sean capturadas por el parámetro dinámico
+router.get('/my/emprendimientos', auth, getMyEmprendimientos);
 router.get('/nearby/list', optionalAuth, async (req, res) => {
   const { lat, lng, radio = 15, limit = 20 } = req.query
   if (!lat || !lng) return res.status(400).json({ error: 'lat y lng son requeridos' })
@@ -69,7 +71,6 @@ router.get('/:id', optionalAuth, getEmprendimientoById);
 
 // Protected routes
 router.post('/', auth, validateCreateEmprendimiento, createEmprendimiento);
-router.get('/my/emprendimientos', auth, getMyEmprendimientos);
 router.put('/:id', auth, validateUpdateEmprendimiento, updateEmprendimiento);
 router.delete('/:id', auth, authorize('superadministrador'), deleteEmprendimiento);
 

@@ -112,15 +112,6 @@ const whyReasons = [
                   </div>
                 </div>
               </div>
-              <div class="pillars-side">
-                <p class="pillars-label">Pilares del proyecto</p>
-                <div class="pillars-grid">
-                  <div v-for="(p, i) in pillars" :key="i" class="pillar-card" :style="{ background: p.bg }">
-                    <svg class="pillar-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" v-html="p.icon"></svg>
-                    <span class="pillar-label">{{ p.label }}</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -266,25 +257,24 @@ const whyReasons = [
 }
 
 /* HERO */
-.hero-section { position:relative; z-index:1; padding:6rem 0 4rem; text-align:center; }
+.hero-section { position:relative; z-index:1; padding:6rem 0 2.5rem; text-align:center; }
 .eyebrow-wrap { display:inline-flex; align-items:center; gap:.75rem; margin-bottom:1.5rem; }
 .eyebrow-line { display:block; width:2rem; height:1px; background:#ff6b6b; }
 .eyebrow-text { color:#ff6b6b; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.25em; text-shadow:0 1px 6px rgba(0,0,0,.9); }
 .hero-title { font-size:clamp(2.5rem,7vw,6rem); font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:-.04em; line-height:1; margin-bottom:1.25rem; text-shadow:0 2px 20px rgba(0,0,0,.8); }
 .hero-accent { color:#ff4444; text-shadow:0 0 40px rgba(193,18,31,.7), 0 2px 20px rgba(0,0,0,.9); }
 .hero-sub { color:#fff; font-size:clamp(.95rem,2vw,1.25rem); max-width:34rem; margin:0 auto; font-weight:600; line-height:1.65; text-shadow:0 2px 12px rgba(0,0,0,.95); }
-.scroll-hint  { margin-top:3rem; display:flex; flex-direction:column; align-items:center; gap:.5rem; opacity:.6; }
+.scroll-hint  { margin-top:1.5rem; display:flex; flex-direction:column; align-items:center; gap:.5rem; opacity:.6; }
 .sh-label { color:#fff; font-size:.6rem; font-weight:900; text-transform:uppercase; letter-spacing:.25em; text-shadow:0 1px 6px rgba(0,0,0,.8); }
 .sh-line  { width:1px; height:2.5rem; background:linear-gradient(to bottom,rgba(255,255,255,.8),transparent); animation:pulse 2s ease-in-out infinite; }
 @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
 
 /* MISIÓN */
-.mission-section { position:relative; z-index:1; padding:1rem 0 5rem; }
+.mission-section { position:relative; z-index:1; padding:0.5rem 0 4rem; }
 .badge-wrap  { text-align:center; margin-bottom:3rem; }
 .glass-badge { display:inline-block; padding:.5rem 1.25rem; border-radius:999px; border:1px solid rgba(255,100,100,.5); color:#ff6b6b; font-size:.65rem; font-weight:900; text-transform:uppercase; letter-spacing:.2em; backdrop-filter:blur(10px); background:rgba(0,0,0,.2); }
-.mission-card { border-radius:2rem; overflow:hidden; background:rgba(255,255,255,.06); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 60px rgba(0,0,0,.4); }
+.mission-card { border-radius:2rem; overflow:hidden; background:rgba(255,255,255,.06); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.12); box-shadow:0 24px 60px rgba(0,0,0,.4); max-width:680px; margin:0 auto; }
 .mission-grid { display:grid; grid-template-columns:1fr; }
-@media(min-width:768px){.mission-grid{grid-template-columns:1.4fr 1fr}}
 .mission-text     { padding:2rem 2.5rem; display:flex; flex-direction:column; justify-content:center; }
 .mission-heading  { font-size:clamp(1.4rem,2.5vw,2rem); font-weight:900; color:#fff; text-transform:uppercase; letter-spacing:-.03em; line-height:1.05; margin-bottom:1rem; }
 .mission-body     { color:rgba(255,240,220,.85); font-size:.875rem; line-height:1.65; font-weight:500; margin-bottom:.75rem; }

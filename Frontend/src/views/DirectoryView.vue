@@ -1,9 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
-import { getAllBusinesses, getCategories, getNearbyBusinesses } from '../services/businessService'
+import { getAllBusinesses, getCategories, getNearbyBusinesses, searchProducts, getProductImages } from '../services/businessService'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,6 +60,42 @@ const municipalities = computed(() => {
 
 const allBusinesses = ref([])
 const categories = ref([])
+const directoryTab = ref('negocios') // 'negocios' | 'productos'
+const productResults = ref([])
+const productImageMap = reactive({}) // { id_producto: url } — reactive para detección automática
+const searchingProducts = ref(false)
+const productSearchDone = ref(false)
+
+let productSearchTimer = null
+const loadProducts = async (q = '') => {
+  searchingProducts.value = true
+  try {
+    const results = await searchProducts(q, 60)
+    // Agregar imageUrl directamente al objeto antes de mostrar
+    await Promise.all(results.map(async (p) => {
+      try {
+        const imgs = await getProductImages(p.id_producto)
+        p.imageUrl = imgs.length ? imgs[0].url : null
+      } catch { p.imageUrl = null }
+    }))
+    productResults.value = results
+    productSearchDone.value = true
+  } catch { productResults.value = [] }
+  finally { searchingProducts.value = false }
+}
+
+const onSearchForProducts = () => {
+  clearTimeout(productSearchTimer)
+  const q = searchKeyword.value.trim()
+  productSearchTimer = setTimeout(() => loadProducts(q), 200)
+}
+
+const formatProdPrice = (p) => {
+  if (p.visibilidad_precio === 'OCULTO') return 'Consultar'
+  if (!p.precio) return ''
+  const prefix = p.visibilidad_precio === 'APROXIMADO' ? '~' : ''
+  return `${prefix}Q${Number(p.precio) % 1 === 0 ? Number(p.precio).toFixed(0) : Number(p.precio).toFixed(2)}`
+}
 const sortBy = ref('default') // 'default' | 'mejor_valorado' | 'cercano'
 const nearbyMap = ref({}) // id → distancia_km
 const loadingNearby = ref(false)
@@ -169,14 +205,27 @@ onMounted(async () => {
         <p class="text-slate-500 font-medium">Explora los mejores negocios de toda Guatemala</p>
       </div>
 
+      <!-- Tabs Negocios / Productos -->
+      <div class="flex gap-1 p-1.5 bg-slate-100 rounded-2xl mb-5 w-fit">
+        <button @click="directoryTab = 'negocios'"
+          :class="['px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all', directoryTab === 'negocios' ? 'bg-white text-fiery-navy shadow-sm' : 'text-slate-400 hover:text-slate-600']">
+          Negocios
+        </button>
+        <button @click="directoryTab = 'productos'; if (!productSearchDone) loadProducts()"
+          :class="['px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all', directoryTab === 'productos' ? 'bg-white text-fiery-navy shadow-sm' : 'text-slate-400 hover:text-slate-600']">
+          Productos
+        </button>
+      </div>
+
       <!-- Barra de búsqueda principal + botón filtros -->
       <div class="flex gap-3 mb-6">
         <div class="relative flex-1">
           <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
           <input
             v-model="searchKeyword"
+            @input="directoryTab === 'productos' ? onSearchForProducts() : null"
             type="text"
-            placeholder="Busca un negocio por nombre..."
+            :placeholder="directoryTab === 'productos' ? 'Busca un producto o servicio...' : 'Busca un negocio por nombre...'"
             class="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white text-fiery-navy font-bold outline-none focus:border-fiery-red transition-all shadow-sm text-sm"
           />
         </div>
@@ -198,7 +247,56 @@ onMounted(async () => {
         </button>
       </div>
 
-      <div class="flex flex-col lg:flex-row gap-8">
+      <!-- ═══ TAB PRODUCTOS ═══ -->
+      <div v-if="directoryTab === 'productos'" class="min-h-[400px]">
+        <!-- Estado: cargando -->
+        <div v-if="searchingProducts" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 mt-4">
+          <div v-for="i in 8" :key="i" class="bg-white rounded-2xl h-56 animate-pulse border border-slate-100"></div>
+        </div>
+        <!-- Resultados -->
+        <div v-else-if="productResults.length > 0" class="mt-2">
+          <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">{{ productResults.length }} resultado{{ productResults.length !== 1 ? 's' : '' }}</p>
+          <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+            <RouterLink
+              v-for="prod in productResults"
+              :key="prod.id_producto"
+              :to="`/negocio/${prod.emprendimiento_id}`"
+              class="group bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+            >
+              <!-- Imagen del producto -->
+              <div class="h-40 bg-gradient-to-br from-slate-50 to-slate-200 relative flex items-center justify-center overflow-hidden">
+                <svg class="w-10 h-10 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <img v-if="prod.imageUrl"
+                  :src="prod.imageUrl"
+                  class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                <!-- Precio -->
+                <div v-if="formatProdPrice(prod)" class="absolute bottom-2 right-2 bg-fiery-navy/90 text-white text-[10px] font-black px-2 py-1 rounded-full">
+                  {{ formatProdPrice(prod) }}
+                </div>
+              </div>
+              <!-- Info -->
+              <div class="p-4">
+                <h3 class="font-black text-fiery-navy text-sm line-clamp-1">{{ prod.nombre }}</h3>
+                <p v-if="prod.descripcion" class="text-slate-400 text-[11px] mt-0.5 line-clamp-2 leading-snug">{{ prod.descripcion }}</p>
+                <div class="flex items-center gap-2 mt-2 pt-2 border-t border-slate-50">
+                  <img v-if="prod.emprendimiento_logo" :src="prod.emprendimiento_logo" class="w-5 h-5 rounded-md object-cover" />
+                  <div v-else class="w-5 h-5 rounded-md bg-fiery-navy/20 flex items-center justify-center text-[9px] font-black text-fiery-navy">
+                    {{ (prod.emprendimiento_nombre || '?').charAt(0) }}
+                  </div>
+                  <span class="text-[10px] text-slate-400 font-bold truncate">{{ prod.emprendimiento_nombre }}</span>
+                </div>
+              </div>
+            </RouterLink>
+          </div>
+        </div>
+        <!-- Sin resultados -->
+        <div v-else-if="productSearchDone" class="text-center py-16 text-slate-400">
+          <p class="font-black text-lg">Sin resultados para "{{ searchKeyword }}"</p>
+          <p class="text-sm mt-1">Intenta con otro término</p>
+        </div>
+      </div>
+
+      <div v-if="directoryTab === 'negocios'" class="flex flex-col lg:flex-row gap-8">
 
         <!-- Sidebar filtros -->
         <transition :name="isDesktop ? '' : 'slide-fade'">
@@ -360,7 +458,7 @@ onMounted(async () => {
           </div>
         </main>
 
-      </div>
+      </div><!-- fin v-if negocios -->
     </div>
   </div>
 </template>

@@ -151,15 +151,24 @@ class ProductoServicio {
 
   static async search(term, filters = {}) {
     let query = `
-      SELECT ps.*, 
+      SELECT ps.*,
              e.nombre as emprendimiento_nombre,
+             e.logo_url as emprendimiento_logo,
+             e.municipio as emprendimiento_municipio,
+             e.departamento as emprendimiento_departamento,
+             e.id_emprendimiento as emprendimiento_id,
+             c.nombre as categoria_nombre,
+             (SELECT TOP 1 url FROM IMAGENES_PRODUCTO WHERE id_producto = ps.id_producto ORDER BY id_imagen_producto ASC) as imagen_url,
              (SELECT COUNT(*) FROM IMAGENES_PRODUCTO WHERE id_producto = ps.id_producto) as total_imagenes
       FROM ProductosServicios ps
       LEFT JOIN Emprendimientos e ON ps.id_emprendimiento = e.id_emprendimiento
-      WHERE ps.nombre LIKE @term
+      LEFT JOIN Categorias c ON e.id_categoria = c.id_categoria
+      WHERE (ps.nombre LIKE @term OR ps.descripcion LIKE @term)
+        AND LOWER(e.estado) IN ('activo', 'aprobado')
+        AND ps.disponible = 1
     `;
     
-    const params = [{ name: 'term', value: `%${term}%`, type: sql.NVarChar }];
+    const params = [{ name: 'term', value: term ? `%${term}%` : '%', type: sql.NVarChar }];
     let paramIndex = 1;
 
     if (filters.id_emprendimiento) {

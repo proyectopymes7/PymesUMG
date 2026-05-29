@@ -3,8 +3,9 @@ import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
+import ImageSuggestModal from '../components/shared/ImageSuggestModal.vue'
 import { useAuthStore } from '../stores/auth'
-import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage, uploadProductImage } from '../services/businessService'
+import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage, uploadProductImage, getProductImages } from '../services/businessService'
 import api from '../services/api'
 
 const router = useRouter()
@@ -129,6 +130,7 @@ const form = ref({
 })
 
 const selectedCategorias = ref([])
+const traderCatOpen = ref(false)
 
 // Horario
 const daysMap = { Lunes: 'Lun', Martes: 'Mar', Miércoles: 'Mié', Jueves: 'Jue', Viernes: 'Vie', Sábado: 'Sáb', Domingo: 'Dom' }
@@ -170,9 +172,30 @@ const loadingProducts = ref(false)
 const showProductForm = ref(false)
 const editingProduct = ref(null)
 const deletingId = ref(null)
+const productErrors = ref({})
 const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
 const generatingDesc = ref(false)
 const generatingBizDesc = ref(false)
+const showBizImageSuggest = ref(false)
+const showProdImageSuggest = ref(false)
+const prodImageSuggestedUrl = ref(null)
+
+const onProdImageSelected = (url) => {
+  productImagePreview.value = url
+  prodImageSuggestedUrl.value = url
+  productImageFile.value = null
+  showProdImageSuggest.value = false
+}
+
+const onBizImageSuggested = async (url) => {
+  logoPreview.value = url
+  logoFile.value = null
+  try {
+    await updateBusinessData(business.value.id, { logo_url: url })
+    business.value = { ...business.value, logo: url, image: url }
+    showToast('Foto actualizada')
+  } catch { showToast('Error al guardar la imagen', 'error') }
+}
 
 const generateBusinessDescription = async () => {
   if (!business.value?.name?.trim() || generatingBizDesc.value) return
@@ -213,18 +236,41 @@ const generateProductDescription = async () => {
 const productImageFile = ref(null)
 const productImagePreview = ref(null)
 const productFileInputRef = ref(null)
+const productImageUploading = ref(false)
 
-const handleProductImageChange = (e) => {
+const handleProductImageChange = async (e) => {
   const file = e.target.files[0]
-  if (file) { productImageFile.value = file; productImagePreview.value = URL.createObjectURL(file) }
+  if (!file) return
+  // Preview inmediato
+  productImagePreview.value = URL.createObjectURL(file)
+  productImageFile.value = null
+  productImageUploading.value = true
+  try {
+    // Comprimir y subir inmediatamente usando el método optimizado
+    const url = await uploadImage(file, 'imagenes')
+    productImagePreview.value = url
+    prodImageSuggestedUrl.value = url  // reusar este campo para guardar la URL
+  } catch (err) {
+    showToast('Error al subir la imagen: ' + (err.message || ''), 'error')
+    productImagePreview.value = null
+  } finally {
+    productImageUploading.value = false
+    if (productFileInputRef.value) productFileInputRef.value.value = ''
+  }
 }
-const clearProductImage = () => { productImageFile.value = null; productImagePreview.value = null }
+const clearProductImage = () => {
+  productImageFile.value = null
+  productImagePreview.value = null
+  prodImageSuggestedUrl.value = null
+}
 
 const openNewProduct = () => {
   editingProduct.value = null
   productForm.value = { tipo: 'producto', nombre: '', descripcion: '', precio: '' }
   productImageFile.value = null
   productImagePreview.value = null
+  prodImageSuggestedUrl.value = null
+  productErrors.value = {}
   showProductForm.value = true
 }
 
@@ -241,13 +287,24 @@ const fetchProducts = async () => {
   loadingProducts.value = true
   try {
     const res = await api.get(`/productos/emprendimiento/${business.value.id}`)
-    products.value = res.data?.data || []
+    const prods = res.data?.data || []
+    await Promise.all(prods.map(async (p) => {
+      try {
+        const imgs = await getProductImages(p.id_producto)
+        p.imageUrl = imgs.length ? imgs[0].url : null
+      } catch { p.imageUrl = null }
+    }))
+    products.value = prods
   } catch (e) { console.error(e) }
   finally { loadingProducts.value = false }
 }
 
 const saveProduct = async () => {
-  if (!productForm.value.nombre.trim()) { showToast('El nombre es requerido', 'error'); return }
+  productErrors.value = {}
+  if (!productForm.value.nombre.trim()) productErrors.value.nombre = 'El nombre es requerido'
+  if (!productForm.value.precio || Number(productForm.value.precio) <= 0) productErrors.value.precio = 'El precio es requerido'
+  if (!productForm.value.descripcion?.trim()) productErrors.value.descripcion = 'La descripción es requerida'
+  if (Object.keys(productErrors.value).length) return
   loadingProducts.value = true
   try {
     let savedId = null
@@ -258,12 +315,15 @@ const saveProduct = async () => {
       const res = await api.post('/productos', { ...productForm.value, id_emprendimiento: business.value.id })
       savedId = res.data?.data?.id_producto || res.data?.id_producto
     }
-    if (productImageFile.value && savedId) {
+    // Guardar URL de imagen en IMAGENES_PRODUCTO
+    if (savedId && prodImageSuggestedUrl.value) {
       try {
-        const imgUrl = await uploadProductImage(productImageFile.value, savedId)
-        productImagePreview.value = imgUrl
-        productImageFile.value = null
-      } catch (e) { showToast('Guardado, pero falló la imagen', 'error') }
+        await api.post(`/imagenes/producto/${savedId}/url`, { url: prodImageSuggestedUrl.value })
+        prodImageSuggestedUrl.value = null
+      } catch (e) {
+        console.error('Error guardando imagen:', e)
+        showToast('Producto guardado, pero no se pudo vincular la imagen', 'error')
+      }
     }
     showToast(editingProduct.value ? 'Producto actualizado' : 'Producto creado')
     showProductForm.value = false
@@ -465,21 +525,28 @@ const saveGeneral = async () => {
       <!-- Header con logo del negocio -->
       <div class="mb-8 flex flex-col sm:flex-row items-center sm:items-end gap-5">
         <!-- Logo editable -->
-        <div class="relative group flex-shrink-0">
-          <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-slate-100">
-            <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-cover" />
-            <div v-else class="w-full h-full flex items-center justify-center bg-fiery-navy text-white font-black text-4xl uppercase">
-              {{ business.name?.charAt(0) || '?' }}
+        <div class="flex-shrink-0 flex flex-col items-center gap-2">
+          <div class="relative cursor-pointer" @click="logoInputRef?.click()">
+            <div class="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-4 border-white shadow-xl bg-slate-100">
+              <img v-if="logoPreview" :src="logoPreview" class="w-full h-full object-cover" />
+              <div v-else class="w-full h-full flex items-center justify-center bg-fiery-navy text-white font-black text-4xl uppercase">
+                {{ business.name?.charAt(0) || '?' }}
+              </div>
             </div>
           </div>
-          <button @click="logoInputRef?.click()"
-            class="absolute bottom-0 right-0 w-8 h-8 bg-fiery-red text-white rounded-full flex items-center justify-center shadow-md hover:bg-fiery-darkred transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
-            </svg>
-          </button>
           <input ref="logoInputRef" type="file" accept="image/*" class="hidden" @change="handleLogoChange" />
+          <!-- Botones de foto -->
+          <div class="flex gap-2">
+            <button type="button" @click="logoInputRef?.click()"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all bg-slate-100 text-slate-600 hover:bg-slate-200">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Foto
+            </button>
+            <button type="button" @click="showBizImageSuggest = true"
+              class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+              ✦ IA
+            </button>
+          </div>
         </div>
         <div class="text-center sm:text-left">
           <h4 class="text-fiery-red font-black uppercase tracking-[0.3em] text-xs mb-1">Mi Negocio</h4>
@@ -534,21 +601,38 @@ const saveGeneral = async () => {
         </div>
 
         <!-- Categorías -->
-        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+        <div class="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 relative">
           <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-            Categorías <span class="text-slate-300 font-normal normal-case">(mín. 1, máx. 3)</span>
+            Categorías <span class="text-slate-300 font-normal normal-case">(máx. 3)</span>
           </p>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <!-- Backdrop -->
+          <div v-if="traderCatOpen" class="fixed inset-0 z-10" @click="traderCatOpen = false"></div>
+          <!-- Trigger con chips -->
+          <button type="button" @click.stop="traderCatOpen = !traderCatOpen"
+            @blur="setTimeout(() => { traderCatOpen = false }, 150)"
+            class="w-full min-h-[44px] border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 flex items-center flex-wrap gap-2 text-left focus:outline-none focus:border-fiery-navy transition-all">
+            <span v-if="selectedCategorias.length === 0" class="text-slate-400 text-sm font-medium">Selecciona categorías...</span>
+            <span v-for="id in selectedCategorias" :key="id"
+              class="inline-flex items-center gap-1 bg-fiery-navy text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+              {{ categories.find(c => c.id_categoria === id)?.nombre }}
+              <button type="button" @click.stop="selectedCategorias.splice(selectedCategorias.indexOf(id), 1)"
+                class="hover:text-white/60 transition-colors leading-none">×</button>
+            </span>
+            <svg class="w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform" :class="traderCatOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <!-- Dropdown -->
+          <div v-if="traderCatOpen" class="absolute z-20 left-6 right-6 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto" @click.stop>
             <button v-for="cat in categories" :key="cat.id_categoria" type="button"
               :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
               @click="selectedCategorias.includes(cat.id_categoria)
                 ? selectedCategorias.splice(selectedCategorias.indexOf(cat.id_categoria), 1)
-                : selectedCategorias.push(cat.id_categoria)"
-              :class="[
-                'px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all border text-left',
-                selectedCategorias.includes(cat.id_categoria) ? 'bg-fiery-navy text-white border-fiery-navy' : 'bg-white text-slate-500 border-slate-200 hover:border-fiery-red hover:text-fiery-red',
-                (!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3) ? 'opacity-40 cursor-not-allowed' : ''
-              ]">{{ cat.nombre }}</button>
+                : (selectedCategorias.length < 3 && selectedCategorias.push(cat.id_categoria))"
+              class="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-b border-slate-50 last:border-0">
+              <span :class="['w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors', selectedCategorias.includes(cat.id_categoria) ? 'bg-fiery-navy border-fiery-navy' : 'border-slate-300']">
+                <svg v-if="selectedCategorias.includes(cat.id_categoria)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+              </span>
+              <span class="font-bold text-fiery-navy">{{ cat.nombre }}</span>
+            </button>
           </div>
         </div>
 
@@ -660,11 +744,14 @@ const saveGeneral = async () => {
             </button>
           </div>
 
-          <input v-model="productForm.nombre" placeholder="Nombre *" type="text"
-            class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
+          <div>
+            <input v-model="productForm.nombre" placeholder="Nombre *" type="text"
+              :class="['w-full border bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none', productErrors.nombre ? 'border-red-400' : 'border-slate-200 focus:border-fiery-navy']" />
+            <p v-if="productErrors.nombre" class="text-[10px] text-red-500 font-bold mt-1 ml-1">{{ productErrors.nombre }}</p>
+          </div>
           <div class="relative">
-            <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
-              class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 pr-24 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+            <textarea v-model="productForm.descripcion" placeholder="Descripción *" rows="2"
+              :class="['w-full border bg-slate-50 rounded-xl px-4 py-2.5 pr-24 text-sm text-slate-600 focus:outline-none resize-none', productErrors.descripcion ? 'border-red-400' : 'border-slate-200 focus:border-fiery-navy']"></textarea>
             <button
               type="button"
               @click="generateProductDescription"
@@ -680,7 +767,7 @@ const saveGeneral = async () => {
           </div>
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
-            <input v-model="productForm.precio" placeholder="Precio (opcional)" type="number" min="0" step="0.01"
+            <input v-model="productForm.precio" placeholder="0.00" type="number" min="0" step="0.01"
               class="w-full border border-slate-200 bg-slate-50 rounded-xl pl-7 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
           </div>
 
@@ -694,12 +781,25 @@ const saveGeneral = async () => {
                 <button @click="clearProductImage" class="bg-red-500/80 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Quitar</button>
               </div>
             </div>
+            <!-- Subiendo -->
+            <div v-else-if="productImageUploading" class="w-full h-[110px] rounded-xl border-2 border-slate-200 bg-slate-50 flex items-center justify-center gap-3">
+              <svg class="animate-spin w-5 h-5 text-fiery-navy" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              <span class="text-sm font-bold text-slate-500">Subiendo imagen...</span>
+            </div>
             <div v-else @click="productFileInputRef?.click()"
               class="w-full h-[110px] rounded-xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-50 transition-colors">
               <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
-              <span class="text-xs font-bold text-slate-400">Agregar imagen (opcional)</span>
+              <span class="text-xs font-bold text-slate-400">Agregar imagen</span>
+            </div>
+            <!-- Sugerir imagen con IA (dentro del bloque producto) -->
+            <div class="flex justify-center pt-1">
+              <button type="button" @click="showProdImageSuggest = true"
+                :disabled="!productForm.nombre?.trim()"
+                class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                ✦ Sugerir imagen con IA
+              </button>
             </div>
           </template>
 
@@ -738,7 +838,7 @@ const saveGeneral = async () => {
 
             <!-- Imagen (solo productos) -->
             <div v-if="prod.tipo?.toLowerCase() === 'producto'" class="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden flex-shrink-0 flex items-center justify-center text-slate-300 border border-slate-200 hidden sm:flex">
-              <img v-if="prod.imagen_url" :src="prod.imagen_url" class="w-full h-full object-cover" />
+              <img v-if="prod.imageUrl" :src="prod.imageUrl" class="w-full h-full object-cover" />
               <svg v-else class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
@@ -826,6 +926,26 @@ const saveGeneral = async () => {
     </transition>
 
   </div>
+
+  <!-- Modales de sugerencias IA -->
+  <ImageSuggestModal
+    :show="showBizImageSuggest"
+    :nombre="business?.name"
+    :categoria="business?.category"
+    :descripcion="business?.description"
+    :municipio="business?.muni"
+    :departamento="business?.dept"
+    @close="showBizImageSuggest = false"
+    @selected="onBizImageSuggested"
+  />
+  <ImageSuggestModal
+    :show="showProdImageSuggest"
+    :nombre="productForm.nombre"
+    :categoria="productForm.tipo"
+    :descripcion="productForm.descripcion"
+    @close="showProdImageSuggest = false"
+    @selected="onProdImageSelected"
+  />
 </template>
 
 <style scoped>

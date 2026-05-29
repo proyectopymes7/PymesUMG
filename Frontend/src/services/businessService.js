@@ -246,6 +246,19 @@ export const getBusinessReviews = async (businessId) => {
   }
 };
 
+export const searchProducts = async (term, limit = 40) => {
+  try {
+    const response = await api.get('/productos/search', { params: { q: term, limit } })
+    if (response.data.success && response.data.data) {
+      return response.data.data
+    }
+    return []
+  } catch (error) {
+    console.error('Error searching products:', error)
+    return []
+  }
+}
+
 export const getTopRatedBusinesses = async (limit = 20) => {
   try {
     const response = await api.get('/emprendimientos', { params: { sort: 'rating', limit } })

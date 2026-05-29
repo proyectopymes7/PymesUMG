@@ -10,6 +10,7 @@ const emit = defineEmits(['update:modelValue'])
 
 const mapContainer  = ref(null)
 const searchInputEl = ref(null)
+const mapExpanded   = ref(false)
 const searchText    = ref('')
 const suggestions   = ref([])
 const showDropdown  = ref(false)
@@ -142,7 +143,7 @@ onMounted(async () => {
   // Esperar al siguiente frame para que el contenedor esté visible
   // (necesario cuando se monta dentro de un modal con animación)
   await nextTick()
-  await new Promise(r => setTimeout(r, 50))
+  await new Promise(r => setTimeout(r, 300)) // esperar animación de transición de paso
 
   try {
     await loadGoogleMaps()
@@ -164,6 +165,7 @@ onMounted(async () => {
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: false,
+    gestureHandling: 'greedy',  // Un solo dedo mueve el mapa en móvil
     zoomControlOptions: { position: window.google.maps.ControlPosition.RIGHT_CENTER }
   })
 
@@ -249,20 +251,29 @@ watch(() => props.modelValue, (val) => {
     <div class="relative">
       <div
         ref="mapContainer"
-        class="w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm"
-        :class="readonly ? 'h-56' : 'h-60'"
+        class="w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm transition-all duration-300"
+        :class="readonly ? 'h-56' : (mapExpanded ? 'h-[70vh]' : 'h-72 md:h-64')"
       ></div>
 
-      <!-- Hint flotante siempre visible en modo edición -->
-      <div
+      <!-- Botón expandir (solo en modo edición, solo móvil) -->
+      <button
         v-if="!readonly"
-        class="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none"
+        type="button"
+        @click="mapExpanded = !mapExpanded"
+        class="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-fiery-navy text-[10px] font-black px-3 py-1.5 rounded-lg shadow-md hover:bg-white transition-all flex items-center gap-1.5 uppercase tracking-widest"
       >
+        <svg v-if="!mapExpanded" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+        <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9l-5-5m0 0v4m0-4h4M15 9l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4m6 0l5 5m0 0v-4m0 4h-4"/></svg>
+        {{ mapExpanded ? 'Reducir' : 'Ampliar' }}
+      </button>
+
+      <!-- Hint flotante -->
+      <div v-if="!readonly" class="absolute bottom-2 left-1/2 -translate-x-1/2 pointer-events-none">
         <div class="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1.5 shadow-md flex items-center gap-1.5 whitespace-nowrap">
           <svg class="w-3.5 h-3.5 text-fiery-red flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
           </svg>
-          <span class="text-[11px] font-semibold text-fiery-navy">Haz clic en el mapa o arrastra el pin</span>
+          <span class="text-[11px] font-semibold text-fiery-navy">Toca el mapa para poner el pin</span>
         </div>
       </div>
     </div>

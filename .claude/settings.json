@@ -3,7 +3,8 @@
     "allow": [
       "Bash(powershell -Command \"\\(Get-Content Frontend/src/views/ResetPasswordView.vue\\) -replace '/src/assets/AntiguaVolcan\\\\.webp', 'https://pymesadmin.blob.core.windows.net/imagenes/4605ae9d-4213-4df7-abe7-f3f1fb86c21c.webp' | Set-Content Frontend/src/views/ResetPasswordView.vue -Encoding utf8\")",
       "Bash(node -e ' *)",
-      "Bash(node -e \"require\\('@anthropic-ai/sdk'\\); console.log\\('ok'\\)\")"
+      "Bash(node -e \"require\\('@anthropic-ai/sdk'\\); console.log\\('ok'\\)\")",
+      "Bash(node -e \"require\\('dotenv'\\).config\\(\\); console.log\\('PEXELS_API_KEY:', process.env.PEXELS_API_KEY ? 'configurada ✓' : 'VACÍA ✗'\\)\")"
     ]
   }
 }

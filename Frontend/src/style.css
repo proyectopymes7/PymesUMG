@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Ocultar scrollbars feos manteniendo funcionalidad */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
 @theme {
   --color-fiery-darkred: #780000;
   --color-fiery-red: #C1121F;
