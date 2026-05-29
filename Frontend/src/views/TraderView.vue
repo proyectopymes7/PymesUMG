@@ -5,7 +5,7 @@ import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import ImageSuggestModal from '../components/shared/ImageSuggestModal.vue'
 import { useAuthStore } from '../stores/auth'
-import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage, uploadProductImage } from '../services/businessService'
+import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage, uploadProductImage, getProductImages } from '../services/businessService'
 import api from '../services/api'
 
 const router = useRouter()
@@ -172,12 +172,20 @@ const loadingProducts = ref(false)
 const showProductForm = ref(false)
 const editingProduct = ref(null)
 const deletingId = ref(null)
+const productErrors = ref({})
 const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
 const generatingDesc = ref(false)
 const generatingBizDesc = ref(false)
 const showBizImageSuggest = ref(false)
 const showProdImageSuggest = ref(false)
 const prodImageSuggestedUrl = ref(null)
+
+const onProdImageSelected = (url) => {
+  productImagePreview.value = url
+  prodImageSuggestedUrl.value = url
+  productImageFile.value = null
+  showProdImageSuggest.value = false
+}
 
 const onBizImageSuggested = async (url) => {
   logoPreview.value = url
@@ -228,12 +236,33 @@ const generateProductDescription = async () => {
 const productImageFile = ref(null)
 const productImagePreview = ref(null)
 const productFileInputRef = ref(null)
+const productImageUploading = ref(false)
 
-const handleProductImageChange = (e) => {
+const handleProductImageChange = async (e) => {
   const file = e.target.files[0]
-  if (file) { productImageFile.value = file; productImagePreview.value = URL.createObjectURL(file) }
+  if (!file) return
+  // Preview inmediato
+  productImagePreview.value = URL.createObjectURL(file)
+  productImageFile.value = null
+  productImageUploading.value = true
+  try {
+    // Comprimir y subir inmediatamente usando el método optimizado
+    const url = await uploadImage(file, 'imagenes')
+    productImagePreview.value = url
+    prodImageSuggestedUrl.value = url  // reusar este campo para guardar la URL
+  } catch (err) {
+    showToast('Error al subir la imagen: ' + (err.message || ''), 'error')
+    productImagePreview.value = null
+  } finally {
+    productImageUploading.value = false
+    if (productFileInputRef.value) productFileInputRef.value.value = ''
+  }
 }
-const clearProductImage = () => { productImageFile.value = null; productImagePreview.value = null }
+const clearProductImage = () => {
+  productImageFile.value = null
+  productImagePreview.value = null
+  prodImageSuggestedUrl.value = null
+}
 
 const openNewProduct = () => {
   editingProduct.value = null
@@ -241,6 +270,7 @@ const openNewProduct = () => {
   productImageFile.value = null
   productImagePreview.value = null
   prodImageSuggestedUrl.value = null
+  productErrors.value = {}
   showProductForm.value = true
 }
 
@@ -257,13 +287,24 @@ const fetchProducts = async () => {
   loadingProducts.value = true
   try {
     const res = await api.get(`/productos/emprendimiento/${business.value.id}`)
-    products.value = res.data?.data || []
+    const prods = res.data?.data || []
+    await Promise.all(prods.map(async (p) => {
+      try {
+        const imgs = await getProductImages(p.id_producto)
+        p.imageUrl = imgs.length ? imgs[0].url : null
+      } catch { p.imageUrl = null }
+    }))
+    products.value = prods
   } catch (e) { console.error(e) }
   finally { loadingProducts.value = false }
 }
 
 const saveProduct = async () => {
-  if (!productForm.value.nombre.trim()) { showToast('El nombre es requerido', 'error'); return }
+  productErrors.value = {}
+  if (!productForm.value.nombre.trim()) productErrors.value.nombre = 'El nombre es requerido'
+  if (!productForm.value.precio || Number(productForm.value.precio) <= 0) productErrors.value.precio = 'El precio es requerido'
+  if (!productForm.value.descripcion?.trim()) productErrors.value.descripcion = 'La descripción es requerida'
+  if (Object.keys(productErrors.value).length) return
   loadingProducts.value = true
   try {
     let savedId = null
@@ -274,18 +315,15 @@ const saveProduct = async () => {
       const res = await api.post('/productos', { ...productForm.value, id_emprendimiento: business.value.id })
       savedId = res.data?.data?.id_producto || res.data?.id_producto
     }
-    if (productImageFile.value && savedId) {
-      try {
-        const imgUrl = await uploadProductImage(productImageFile.value, savedId)
-        productImagePreview.value = imgUrl
-        productImageFile.value = null
-      } catch (e) { showToast('Guardado, pero falló la imagen', 'error') }
-    } else if (prodImageSuggestedUrl.value && savedId) {
-      // Imagen viene de sugerencias IA — guardar URL directamente en IMAGENES_PRODUCTO
+    // Guardar URL de imagen en IMAGENES_PRODUCTO
+    if (savedId && prodImageSuggestedUrl.value) {
       try {
         await api.post(`/imagenes/producto/${savedId}/url`, { url: prodImageSuggestedUrl.value })
         prodImageSuggestedUrl.value = null
-      } catch (e) { showToast('Guardado, pero falló la imagen de IA', 'error') }
+      } catch (e) {
+        console.error('Error guardando imagen:', e)
+        showToast('Producto guardado, pero no se pudo vincular la imagen', 'error')
+      }
     }
     showToast(editingProduct.value ? 'Producto actualizado' : 'Producto creado')
     showProductForm.value = false
@@ -706,11 +744,14 @@ const saveGeneral = async () => {
             </button>
           </div>
 
-          <input v-model="productForm.nombre" placeholder="Nombre *" type="text"
-            class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
+          <div>
+            <input v-model="productForm.nombre" placeholder="Nombre *" type="text"
+              :class="['w-full border bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none', productErrors.nombre ? 'border-red-400' : 'border-slate-200 focus:border-fiery-navy']" />
+            <p v-if="productErrors.nombre" class="text-[10px] text-red-500 font-bold mt-1 ml-1">{{ productErrors.nombre }}</p>
+          </div>
           <div class="relative">
-            <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
-              class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 pr-24 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+            <textarea v-model="productForm.descripcion" placeholder="Descripción *" rows="2"
+              :class="['w-full border bg-slate-50 rounded-xl px-4 py-2.5 pr-24 text-sm text-slate-600 focus:outline-none resize-none', productErrors.descripcion ? 'border-red-400' : 'border-slate-200 focus:border-fiery-navy']"></textarea>
             <button
               type="button"
               @click="generateProductDescription"
@@ -726,7 +767,7 @@ const saveGeneral = async () => {
           </div>
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
-            <input v-model="productForm.precio" placeholder="Precio (opcional)" type="number" min="0" step="0.01"
+            <input v-model="productForm.precio" placeholder="0.00" type="number" min="0" step="0.01"
               class="w-full border border-slate-200 bg-slate-50 rounded-xl pl-7 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
           </div>
 
@@ -740,12 +781,17 @@ const saveGeneral = async () => {
                 <button @click="clearProductImage" class="bg-red-500/80 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Quitar</button>
               </div>
             </div>
+            <!-- Subiendo -->
+            <div v-else-if="productImageUploading" class="w-full h-[110px] rounded-xl border-2 border-slate-200 bg-slate-50 flex items-center justify-center gap-3">
+              <svg class="animate-spin w-5 h-5 text-fiery-navy" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              <span class="text-sm font-bold text-slate-500">Subiendo imagen...</span>
+            </div>
             <div v-else @click="productFileInputRef?.click()"
               class="w-full h-[110px] rounded-xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-50 transition-colors">
               <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
-              <span class="text-xs font-bold text-slate-400">Agregar imagen (opcional)</span>
+              <span class="text-xs font-bold text-slate-400">Agregar imagen</span>
             </div>
             <!-- Sugerir imagen con IA (dentro del bloque producto) -->
             <div class="flex justify-center pt-1">
@@ -792,7 +838,7 @@ const saveGeneral = async () => {
 
             <!-- Imagen (solo productos) -->
             <div v-if="prod.tipo?.toLowerCase() === 'producto'" class="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden flex-shrink-0 flex items-center justify-center text-slate-300 border border-slate-200 hidden sm:flex">
-              <img v-if="prod.imagen_url" :src="prod.imagen_url" class="w-full h-full object-cover" />
+              <img v-if="prod.imageUrl" :src="prod.imageUrl" class="w-full h-full object-cover" />
               <svg v-else class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
@@ -898,7 +944,7 @@ const saveGeneral = async () => {
     :categoria="productForm.tipo"
     :descripcion="productForm.descripcion"
     @close="showProdImageSuggest = false"
-    @selected="(url) => { productImagePreview.value = url; prodImageSuggestedUrl.value = url; productImageFile.value = null; showProdImageSuggest = false }"
+    @selected="onProdImageSelected"
   />
 </template>
 

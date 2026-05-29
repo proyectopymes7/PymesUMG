@@ -22,16 +22,18 @@ const productImagesCache = ref({})
 
 const getCardThumbnail = (product) => {
   if (product.tipo === 'servicio') return null
-  const cached = productImagesCache.value[product.id_producto]
-  if (cached?.length) return cached[0].url
-  return product.imagen_url || null
+  return product.imageUrl || null
 }
 
-const openProductModal = (product) => {
+const openProductModal = async (product) => {
   selectedProduct.value = product
   productImageIdx.value = 0
-  productImages.value = productImagesCache.value[product.id_producto] || []
   showProductModal.value = true
+  try {
+    productImages.value = await getProductImages(product.id_producto)
+  } catch {
+    productImages.value = []
+  }
 }
 const reviewForm = ref({ calificacion: 0, comentario: '', hoveredStar: 0 })
 const submittingReview = ref(false)
@@ -103,18 +105,15 @@ onMounted(async () => {
 
   try {
     const all = await getBusinessProducts(route.params.id)
-    products.value = all.filter(p => p.tipo !== 'servicio')
-    services.value = all.filter(p => p.tipo === 'servicio')
-
-    // Precarga las imágenes reales de cada producto/servicio en paralelo
-    Promise.all(all.map(async (p) => {
+    // Cargar imagen real de cada producto antes de mostrar
+    await Promise.all(all.map(async (p) => {
       try {
         const imgs = await getProductImages(p.id_producto)
-        productImagesCache.value[p.id_producto] = imgs
-      } catch {
-        productImagesCache.value[p.id_producto] = []
-      }
+        p.imageUrl = imgs.length ? imgs[0].url : null
+      } catch { p.imageUrl = null }
     }))
+    products.value = all.filter(p => p.tipo !== 'servicio')
+    services.value = all.filter(p => p.tipo === 'servicio')
   } catch (error) {
     console.error('Error fetching products:', error)
   }
@@ -262,17 +261,10 @@ const submitReview = async () => {
             </h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
               <div v-for="product in products" :key="product.id_producto" @click="openProductModal(product)" class="bg-white rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm group cursor-pointer hover:shadow-md hover:border-slate-200 transition-all">
-                <div class="h-48 md:h-64 overflow-hidden bg-slate-100">
-                  <img
-                    v-if="getCardThumbnail(product)"
-                    :src="getCardThumbnail(product)"
-                    :alt="product.nombre"
-                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    @error="(e) => e.target.style.display='none'"
-                  />
-                  <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200">
-                    <svg class="w-14 h-14 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                  </div>
+                <div class="h-48 md:h-64 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-200 flex items-center justify-center relative">
+                  <svg class="w-14 h-14 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  <img v-if="product.imageUrl" :src="product.imageUrl"
+                    class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div class="p-5 md:p-6">
                   <div class="flex justify-between items-start gap-2 mb-1">

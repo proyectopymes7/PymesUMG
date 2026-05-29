@@ -44,12 +44,7 @@ router.get('/search', optionalAuth, async (req, res) => {
   try {
     const { q: term, id_emprendimiento, tipo, limit = 20, offset = 0 } = req.query;
 
-    if (!term) {
-      return res.status(400).json({
-        error: 'Search term is required',
-        message: 'Please provide a search term (q parameter)'
-      });
-    }
+    // Si no hay término, usar % para devolver todos los productos activos
 
     const filters = {
       id_emprendimiento,
@@ -58,7 +53,7 @@ router.get('/search', optionalAuth, async (req, res) => {
       offset: parseInt(offset)
     };
 
-    const results = await ProductoServicio.search(term, filters);
+    const results = await ProductoServicio.search(term || '', filters);
 
     res.json({
       success: true,

@@ -63,7 +63,15 @@ const clearBusinessImage = () => {
 const showImageSuggest = ref(false)
 const onImageSuggested = (url) => {
   businessImagePreview.value = url
-  businessImageFile.value = null // ya está en Azure, no necesita re-subirse
+  businessImageFile.value = null
+}
+
+// IA para imágenes de productos en el registro
+const showProdImageSuggest = ref(false)
+const onProdImageSuggestedReg = (url) => {
+  // Agregar como item de imagen del producto actual
+  productImageFiles.value.push({ file: null, preview: url, url })
+  showProdImageSuggest.value = false
 }
 
 const form = ref({
@@ -314,11 +322,16 @@ const submitRequest = async () => {
           const prodId = prodRes.data?.data?.id_producto || prodRes.data?.id_producto
 
           if (prodId && prod.imageFiles?.length) {
-            for (const { file } of prod.imageFiles) {
+            for (const item of prod.imageFiles) {
               try {
-                await uploadProductImage(file, prodId)
+                if (item.file) {
+                  await uploadProductImage(item.file, prodId)
+                } else if (item.url) {
+                  // URL de sugerencia IA — guardar directamente
+                  await api.post(`/imagenes/producto/${prodId}/url`, { url: item.url })
+                }
               } catch (imgErr) {
-                console.warn('Error al subir imagen de producto:', imgErr)
+                console.warn('Error al guardar imagen:', imgErr)
               }
             }
           }
@@ -678,7 +691,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
             <input v-model="productForm.nombre" placeholder="Nombre *" type="text"
               class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
             <div class="relative">
-              <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
+              <textarea v-model="productForm.descripcion" placeholder="Descripción" rows="2"
                 class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 pr-24 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
               <button
                 type="button"
@@ -728,9 +741,27 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
                 <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
-                <span class="text-xs font-bold text-slate-400">Agregar imágenes (opcional)</span>
+                <span class="text-xs font-bold text-slate-400">Agregar imágenes</span>
                 <span class="text-[10px] text-slate-300 mt-0.5">Puedes seleccionar varias</span>
               </div>
+
+              <!-- Botón sugerir imagen con IA -->
+              <div class="flex justify-center">
+                <button type="button" @click="showProdImageSuggest = true"
+                  :disabled="!productForm.nombre?.trim()"
+                  class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                  ✦ Sugerir imagen con IA
+                </button>
+              </div>
+
+              <ImageSuggestModal
+                :show="showProdImageSuggest"
+                :nombre="productForm.nombre"
+                :categoria="productForm.tipo"
+                :descripcion="productForm.descripcion"
+                @close="showProdImageSuggest = false"
+                @selected="onProdImageSuggestedReg"
+              />
             </template>
 
             <div class="flex gap-3 justify-end pt-1">
