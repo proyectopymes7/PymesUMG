@@ -1,8 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { sendPasswordReset } = require('../utils/EmailService');
 
 const generateToken = (userId) => {
   return jwt.sign(
@@ -337,6 +339,80 @@ const changePassword = async (req, res) => {
   }
 };
 
+// ── Recuperar contraseña ────────────────────────────────
+const forgotPassword = async (req, res) => {
+  try {
+    const { correo } = req.body;
+    if (!correo) {
+      return res.status(400).json({ error: 'El correo es requerido' });
+    }
+
+    const user = await User.findByEmail(correo);
+
+    // Siempre responder igual para no revelar si el correo existe
+    if (!user) {
+      return res.json({ success: true, message: 'Si el correo existe, recibirás un enlace de recuperación.' });
+    }
+
+    // Generar token de reset (expira en 1 hora)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000);
+
+    await User.update(user.id_usuario, {
+      reset_token: resetToken,
+      reset_token_expires: resetExpires
+    });
+
+    await sendPasswordReset(user.correo, user.nombre, resetToken);
+
+    logger.info(`Password reset requested: ${correo}`, { ip: req.ip });
+
+    res.json({ success: true, message: 'Si el correo existe, recibirás un enlace de recuperación.' });
+  } catch (error) {
+    logger.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Error al procesar la solicitud' });
+  }
+};
+
+// ── Resetear contraseña con token ───────────────────────
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token y nueva contraseña son requeridos' });
+    }
+
+    if (newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      return res.status(400).json({
+        error: 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número'
+      });
+    }
+
+    const user = await User.findByResetToken(token);
+
+    if (!user || !user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+      return res.status(400).json({ error: 'El enlace de recuperación es inválido o ha expirado' });
+    }
+
+    const saltRounds = 12;
+    const password_hash = await bcrypt.hash(newPassword, saltRounds);
+
+    await User.update(user.id_usuario, {
+      password_hash,
+      reset_token: null,
+      reset_token_expires: null
+    });
+
+    logger.info(`Password reset completed: ${user.correo}`, { ip: req.ip });
+
+    res.json({ success: true, message: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' });
+  } catch (error) {
+    logger.error('Reset password error:', error);
+    res.status(500).json({ error: 'Error al restablecer la contraseña' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -344,6 +420,8 @@ module.exports = {
   getProfile,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
   validateRegister: [
     body('nombre')
       .trim()
