@@ -157,15 +157,16 @@ const updateEmprendimiento = async (req, res) => {
 
     const updateData = req.body;
 
-    // Auto-promote Visitante (4) → Emprendedor (3) when business is approved + send email
-    if (updateData.estado === 'APROBADO') {
+    // Auto-promote Visitante (4) → Emprendedor (3) when business is approved
+    const estadoNorm = updateData.estado?.toLowerCase()
+    if (estadoNorm === 'activo' || estadoNorm === 'aprobado') {
       const owner = await User.findById(emprendimiento.id_usuario);
       if (owner && owner.id_rol === 4) {
         await User.updateRole(emprendimiento.id_usuario, 3);
-        logger.info(`User promoted to Emprendedor: ${owner.correo}`);
+        logger.info(`User promoted to Emprendedor: ${owner.nombre_usuario || owner.correo}`);
       }
-      // Send approval email
-      if (owner) {
+      // Send approval email if user has email
+      if (owner && owner.correo) {
         try {
           await sendBusinessApproved(owner.correo, owner.nombre, emprendimiento.nombre);
           logger.info(`Approval email sent to: ${owner.correo}`);

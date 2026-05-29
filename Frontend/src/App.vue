@@ -5,7 +5,9 @@ import ToastNotification from './components/layout/ToastNotification.vue'
 import { useAuthStore } from './stores/auth'
 
 const authStore = useAuthStore()
-onMounted(() => { authStore.checkAuth() })
+onMounted(() => {
+  authStore.checkAuth()
+})
 </script>
 
 <template>

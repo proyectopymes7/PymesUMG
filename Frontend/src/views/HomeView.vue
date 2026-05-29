@@ -1,10 +1,10 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
-import alfombra from '@/assets/alfombra.webp'
-import { getFeaturedBusinesses, getCategories } from '../services/businessService'
+const alfombra = 'https://pymesadmin.blob.core.windows.net/imagenes/873fd30a-d0f8-456e-9904-87c025e5dbcc.webp'
+import { getFeaturedBusinesses, getCategories, getNearbyBusinesses } from '../services/businessService'
 
 const router = useRouter()
 
@@ -47,6 +47,50 @@ const selectDepartment = (dep) => {
 const closeDrowndowns = (e) => {
   if (!e.target.closest('.cat-dropdown-wrap')) showCategoryDropdown.value = false
   if (!e.target.closest('.dep-dropdown-wrap')) showDepartmentDropdown.value = false
+}
+
+// Negocios cercanos
+const NEARBY_PER_PAGE = 6
+const nearbyBusinesses = ref([])
+const nearbyLoading = ref(false)
+const nearbyError = ref('')
+const userCoords = ref(null)
+const nearbyPage = ref(0)
+const nearbyRevealed = ref(false)
+
+const nearbyPaged = computed(() => nearbyBusinesses.value.slice(nearbyPage.value * NEARBY_PER_PAGE, (nearbyPage.value + 1) * NEARBY_PER_PAGE))
+const nearbyTotalPages = computed(() => Math.ceil(nearbyBusinesses.value.length / NEARBY_PER_PAGE))
+
+const goNearbyPage = (p) => { nearbyPage.value = p; nearbyRevealed.value = false; setTimeout(() => nearbyRevealed.value = true, 50) }
+
+watch(nearbyBusinesses, (val) => {
+  if (val.length > 0) { nearbyPage.value = 0; setTimeout(() => nearbyRevealed.value = true, 80) }
+})
+
+const loadNearby = async (lat, lng) => {
+  nearbyRevealed.value = false
+  nearbyLoading.value = true
+  nearbyError.value = ''
+  try {
+    nearbyBusinesses.value = await getNearbyBusinesses(lat, lng, 15)
+  } catch {
+    nearbyError.value = 'unavailable'
+  } finally {
+    nearbyLoading.value = false
+  }
+}
+
+const requestLocation = () => {
+  if (!navigator.geolocation) { nearbyError.value = 'unavailable'; return }
+  nearbyLoading.value = true
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      userCoords.value = { lat: coords.latitude, lng: coords.longitude }
+      loadNearby(coords.latitude, coords.longitude)
+    },
+    () => { nearbyLoading.value = false; nearbyError.value = 'denied' },
+    { timeout: 8000 }
+  )
 }
 
 // Carousel
@@ -92,6 +136,7 @@ const handleTouchEnd = (e) => {
 }
 
 onMounted(async () => {
+  requestLocation()
   try {
     featuredBusinesses.value = await getFeaturedBusinesses(5)
   } catch (err) {
@@ -107,8 +152,10 @@ onMounted(async () => {
 
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      if (entry.isIntersecting) revealedElements.value.add(entry.target.dataset.id)
-      else revealedElements.value.delete(entry.target.dataset.id)
+      if (entry.isIntersecting) {
+        revealedElements.value.add(entry.target.dataset.id)
+        observer.unobserve(entry.target) // ya no necesita observarse
+      }
     })
   }, { threshold: 0.1 })
 
@@ -153,7 +200,7 @@ onUnmounted(() => {
           </p>
         </div>
         <div class="hidden lg:flex justify-end absolute right-0 bottom-[-230px] z-50 pointer-events-none w-[50%]">
-          <img src="../assets/images/emprendedores_gt.png" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3135/3135715.png'" />
+          <img src="https://pymesadmin.blob.core.windows.net/imagenes/84f5d8ba-92a4-496e-9006-5bec387cd30f.png" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" />
         </div>
       </div>
     </section>
@@ -297,11 +344,98 @@ onUnmounted(() => {
       </div>
     </section>
 
+    <!-- ═══ CERCA DE TI ═══ -->
+    <section class="py-20 md:py-28 bg-slate-50">
+      <div class="container mx-auto px-4 md:px-6 max-w-6xl">
+
+        <!-- Header -->
+        <div class="text-center mb-14 reveal-on-scroll transition-all duration-1000">
+          <h4 class="text-fiery-red font-black uppercase tracking-[0.3em] text-xs mb-3">Tu zona</h4>
+          <h2 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit uppercase tracking-tighter leading-none mb-4">
+            Cerca de <span class="text-fiery-red">Ti</span>
+          </h2>
+          <p class="text-slate-500 text-sm">Negocios a menos de 15 km de tu ubicación actual</p>
+        </div>
+
+        <!-- Estado: cargando -->
+        <div v-if="nearbyLoading" class="grid grid-cols-2 md:grid-cols-3 gap-5">
+          <div v-for="i in 6" :key="i" class="bg-white rounded-2xl h-56 animate-pulse border border-slate-100"></div>
+        </div>
+
+        <!-- Estado: permiso denegado -->
+        <div v-else-if="nearbyError === 'denied'" class="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm max-w-md mx-auto">
+          <div class="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <p class="font-black text-fiery-navy text-lg mb-2">Ubicación no disponible</p>
+          <p class="text-slate-400 text-sm mb-6">Permite el acceso a tu ubicación para ver negocios cercanos</p>
+          <button @click="requestLocation" class="px-7 py-3.5 bg-fiery-red text-white rounded-2xl font-black text-sm hover:bg-fiery-darkred transition-all shadow-lg shadow-fiery-red/20">
+            Permitir ubicación
+          </button>
+        </div>
+
+        <!-- Estado: sin resultados -->
+        <div v-else-if="!nearbyLoading && nearbyBusinesses.length === 0 && userCoords" class="text-center py-8">
+          <p class="font-black text-fiery-navy mb-1">Sin negocios cercanos</p>
+          <p class="text-slate-400 text-sm">No encontramos negocios registrados en un radio de 15 km</p>
+        </div>
+
+        <!-- Resultados con animación escalonada -->
+        <div v-else-if="nearbyPaged.length > 0">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-5 md:gap-6 mb-10">
+            <RouterLink
+              v-for="(b, i) in nearbyPaged"
+              :key="b.id"
+              :to="`/negocio/${b.id}`"
+              class="group bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500"
+              :class="nearbyRevealed ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'"
+              :style="`transition: opacity 0.6s cubic-bezier(.16,1,.3,1) ${i * 90}ms, transform 0.6s cubic-bezier(.16,1,.3,1) ${i * 90}ms, box-shadow 0.3s ease`"
+            >
+              <div class="h-40 overflow-hidden bg-slate-100 relative">
+                <img :src="b.image" :alt="b.name" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div class="absolute top-2 right-2 bg-fiery-navy/90 backdrop-blur-sm text-white text-[10px] font-black px-2.5 py-1 rounded-full shadow">
+                  📍 {{ b.distancia_km }} km
+                </div>
+              </div>
+              <div class="p-4">
+                <span class="text-[9px] font-black uppercase tracking-widest text-fiery-red">{{ b.category }}</span>
+                <h3 class="font-black text-fiery-navy text-base leading-tight mt-0.5 line-clamp-1">{{ b.name }}</h3>
+                <p class="text-slate-400 text-xs mt-1 line-clamp-1">{{ b.location }}</p>
+              </div>
+            </RouterLink>
+          </div>
+
+          <!-- Paginación -->
+          <div v-if="nearbyTotalPages > 1" class="flex items-center justify-center gap-3">
+            <button @click="goNearbyPage(nearbyPage - 1)" :disabled="nearbyPage === 0"
+              class="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-fiery-red hover:text-fiery-red transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+
+            <button v-for="p in nearbyTotalPages" :key="p - 1" @click="goNearbyPage(p - 1)"
+              class="w-9 h-9 rounded-full font-black text-sm transition-all"
+              :class="nearbyPage === p - 1 ? 'bg-fiery-navy text-white shadow-md' : 'border border-slate-200 text-slate-500 hover:border-fiery-navy hover:text-fiery-navy'">
+              {{ p }}
+            </button>
+
+            <button @click="goNearbyPage(nearbyPage + 1)" :disabled="nearbyPage === nearbyTotalPages - 1"
+              class="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center text-slate-500 hover:border-fiery-red hover:text-fiery-red transition-all disabled:opacity-30 disabled:cursor-not-allowed">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+
+          <!-- Botón actualizar -->
+         
+        </div>
+
+      </div>
+    </section>
+
     <!-- ═══ EL DIRECTORIO DIGITAL ═══ -->
     <section class="dir-section">
       <div class="dir-bg-wrap" aria-hidden="true">
         <img
-          src="@/assets/Volcan.webp"
+          src="https://pymesadmin.blob.core.windows.net/imagenes/7e94319b-6fc3-4784-b4a2-e4e496373f38.webp"
           class="dir-bg-img"
           alt="Lago de Atitlán, Guatemala"
         />

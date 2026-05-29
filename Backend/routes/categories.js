@@ -80,10 +80,10 @@ router.post('/', auth, authorize('admin'), async (req, res) => {
   try {
     const { nombre, descripcion, id_categoria_padre, activo } = req.body;
     
-    if (!nombre || !descripcion) {
+    if (!nombre) {
       return res.status(400).json({
         error: 'Missing required fields',
-        message: 'Nombre and descripcion are required'
+        message: 'Nombre is required'
       });
     }
 
@@ -138,28 +138,13 @@ router.put('/:id', auth, authorize('admin'), async (req, res) => {
   }
 });
 
-// Soft delete will be implemented later
-// router.delete('/:id', auth, authorize('admin'), async (req, res) => {
-//   try {
-//     await Categoria.delete(req.params.id);
-//     
-//     res.json({
-//       success: true,
-//       message: 'Category deleted successfully'
-//     });
-//   } catch (error) {
-//     if (error.message.includes('Cannot delete category')) {
-//       return res.status(400).json({
-//         error: 'Cannot delete category',
-//         message: error.message
-//       });
-//     }
-//     
-//     res.status(500).json({
-//       error: 'Failed to delete category',
-//       message: 'Internal server error'
-//     });
-//   }
-// });
+router.delete('/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    await Categoria.update(req.params.id, { activo: false });
+    res.json({ success: true, message: 'Category deactivated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to deactivate category', message: 'Internal server error' });
+  }
+});
 
 module.exports = router;

@@ -14,7 +14,7 @@ const mapBusinessData = (b) => {
     category: cats[0] || 'General',
     categorias: cats,
     categorias_ids: catIds,
-    rating: b.rating_promedio ? Number(b.rating_promedio).toFixed(1) : 4.5,
+    rating: b.rating_promedio ? Number(b.rating_promedio).toFixed(1) : null,
     reviewCount: b.vistas || 0,
     description: b.descripcion,
     dept: b.departamento || '',
@@ -25,8 +25,8 @@ const mapBusinessData = (b) => {
     municipio: b.municipio || '',
     lat: b.latitud ? Number(b.latitud) : null,
     lng: b.longitud ? Number(b.longitud) : null,
-    image: b.logo_url || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80',
-    logo: b.logo_url || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=400&auto=format&fit=crop',
+    image: b.logo_url || 'https://pymesadmin.blob.core.windows.net/logos/f13d047b-6eb2-49c8-beab-b73cbed4b13b.webp',
+    logo: b.logo_url || 'https://pymesadmin.blob.core.windows.net/logos/f13d047b-6eb2-49c8-beab-b73cbed4b13b.webp',
     estado: b.estado ? b.estado.toLowerCase() : 'activo',
     status: b.estado ? b.estado.toLowerCase() : 'activo',
     destacado: b.destacado === 1 || b.destacado === true,
@@ -246,6 +246,19 @@ export const getBusinessReviews = async (businessId) => {
   }
 };
 
+export const getNearbyBusinesses = async (lat, lng, radio = 10) => {
+  try {
+    const response = await api.get('/emprendimientos/nearby/list', { params: { lat, lng, radio, limit: 12 } })
+    if (response.data.success && response.data.data) {
+      return response.data.data.map(b => ({ ...mapBusinessData(b), distancia_km: b.distancia_km }))
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching nearby businesses:', error)
+    return []
+  }
+}
+
 export const getProductImages = async (productId) => {
   try {
     const response = await api.get(`/imagenes/producto/${productId}`);
@@ -314,6 +327,11 @@ export const uploadProductImage = async (file, productId) => {
 
 export const deleteBusinessById = async (id) => {
   await api.delete(`/emprendimientos/${id}`);
+};
+
+export const deleteReview = async (id_calificacion) => {
+  const response = await api.delete(`/calificaciones/${id_calificacion}`);
+  return response.data;
 };
 
 export const createReview = async ({ id_emprendimiento, comentario, calificacion }) => {

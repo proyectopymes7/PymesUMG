@@ -171,6 +171,45 @@ const showProductForm = ref(false)
 const editingProduct = ref(null)
 const deletingId = ref(null)
 const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
+const generatingDesc = ref(false)
+const generatingBizDesc = ref(false)
+
+const generateBusinessDescription = async () => {
+  if (!business.value?.name?.trim() || generatingBizDesc.value) return
+  generatingBizDesc.value = true
+  try {
+    const res = await api.post('/ai/generate-description', {
+      nombre: business.value.name,
+      tipo: 'negocio',
+      nombre_negocio: business.value.name,
+      categoria: business.value.category || '',
+      ubicacion: business.value.location || '',
+      horario: form.horario || ''
+    })
+    if (res.data?.descripcion) form.descripcion = res.data.descripcion
+  } catch { /* silent */ } finally {
+    generatingBizDesc.value = false
+  }
+}
+
+const generateProductDescription = async () => {
+  if (!productForm.value.nombre?.trim() || generatingDesc.value) return
+  generatingDesc.value = true
+  try {
+    const res = await api.post('/ai/generate-description', {
+      nombre: productForm.value.nombre,
+      tipo: productForm.value.tipo,
+      nombre_negocio: business.value?.name,
+      categoria: business.value?.category
+    })
+    if (res.data?.descripcion) productForm.value.descripcion = res.data.descripcion
+  } catch {
+    // silently fail — user can write manually
+  } finally {
+    generatingDesc.value = false
+  }
+}
+
 const productImageFile = ref(null)
 const productImagePreview = ref(null)
 const productFileInputRef = ref(null)
@@ -479,7 +518,16 @@ const saveGeneral = async () => {
               class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-fiery-navy focus:outline-none focus:ring-2 focus:ring-fiery-navy/20 focus:border-fiery-navy transition-all" />
           </div>
           <div>
-            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Descripción</label>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest">Descripción</label>
+              <button type="button" @click="generateBusinessDescription"
+                :disabled="!business?.name?.trim() || generatingBizDesc"
+                class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                <svg v-if="generatingBizDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                <span v-else>✦</span>
+                {{ generatingBizDesc ? 'Generando...' : 'Generar con IA' }}
+              </button>
+            </div>
             <textarea v-model="form.descripcion" rows="4"
               class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-fiery-navy/20 focus:border-fiery-navy transition-all resize-none"></textarea>
           </div>
@@ -614,30 +662,46 @@ const saveGeneral = async () => {
 
           <input v-model="productForm.nombre" placeholder="Nombre *" type="text"
             class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
-          <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
-            class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+          <div class="relative">
+            <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
+              class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2.5 pr-24 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
+            <button
+              type="button"
+              @click="generateProductDescription"
+              :disabled="!productForm.nombre?.trim() || generatingDesc"
+              class="absolute right-2 top-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              :class="generatingDesc ? 'bg-slate-100 text-slate-400' : 'bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white'"
+              title="Generar descripción con IA"
+            >
+              <svg v-if="generatingDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+              <span v-else>✦</span>
+              {{ generatingDesc ? 'Generando...' : 'Generar con IA' }}
+            </button>
+          </div>
           <div class="relative">
             <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
             <input v-model="productForm.precio" placeholder="Precio (opcional)" type="number" min="0" step="0.01"
               class="w-full border border-slate-200 bg-slate-50 rounded-xl pl-7 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
           </div>
 
-          <!-- Imagen producto -->
-          <input type="file" ref="productFileInputRef" accept="image/*" class="hidden" @change="handleProductImageChange" />
-          <div v-if="productImagePreview" class="relative w-full h-[110px] rounded-xl overflow-hidden border border-slate-200 group">
-            <img :src="productImagePreview" class="w-full h-full object-cover" />
-            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-              <button @click="productFileInputRef?.click()" class="bg-white/20 hover:bg-white/40 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Cambiar</button>
-              <button @click="clearProductImage" class="bg-red-500/80 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Quitar</button>
+          <!-- Imagen (solo para productos) -->
+          <template v-if="productForm.tipo === 'producto'">
+            <input type="file" ref="productFileInputRef" accept="image/*" class="hidden" @change="handleProductImageChange" />
+            <div v-if="productImagePreview" class="relative w-full h-[110px] rounded-xl overflow-hidden border border-slate-200 group">
+              <img :src="productImagePreview" class="w-full h-full object-cover" />
+              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                <button @click="productFileInputRef?.click()" class="bg-white/20 hover:bg-white/40 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Cambiar</button>
+                <button @click="clearProductImage" class="bg-red-500/80 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Quitar</button>
+              </div>
             </div>
-          </div>
-          <div v-else @click="productFileInputRef?.click()"
-            class="w-full h-[110px] rounded-xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-50 transition-colors">
-            <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
-            <span class="text-xs font-bold text-slate-400">Agregar imagen (opcional)</span>
-          </div>
+            <div v-else @click="productFileInputRef?.click()"
+              class="w-full h-[110px] rounded-xl border-2 border-dashed border-slate-300 bg-white flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-50 transition-colors">
+              <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+              </svg>
+              <span class="text-xs font-bold text-slate-400">Agregar imagen (opcional)</span>
+            </div>
+          </template>
 
           <div class="flex gap-3 justify-end pt-1">
             <button @click="showProductForm = false" class="px-5 py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
@@ -672,8 +736,8 @@ const saveGeneral = async () => {
           <div v-for="prod in products" :key="prod.id_producto"
             class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center hover:border-slate-300 transition-colors">
 
-            <!-- Imagen -->
-            <div class="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden flex-shrink-0 flex items-center justify-center text-slate-300 border border-slate-200 hidden sm:flex">
+            <!-- Imagen (solo productos) -->
+            <div v-if="prod.tipo?.toLowerCase() === 'producto'" class="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden flex-shrink-0 flex items-center justify-center text-slate-300 border border-slate-200 hidden sm:flex">
               <img v-if="prod.imagen_url" :src="prod.imagen_url" class="w-full h-full object-cover" />
               <svg v-else class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>

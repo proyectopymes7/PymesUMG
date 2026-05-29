@@ -32,11 +32,11 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
-    async loginWithEmail(correo, password) {
+    async loginWithEmail(identifier, password) {
       this.loading = true
       this.error = null
       try {
-        const response = await api.post('/auth/login', { correo, password })
+        const response = await api.post('/auth/login', { identifier, password })
         const { user, token } = response.data.data
 
         this.user = user
@@ -54,11 +54,11 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async register(nombre, apellido, correo, password) {
+    async register(nombre, apellido, correo, password, nombre_usuario) {
       this.loading = true
       this.error = null
       try {
-        const response = await api.post('/auth/register', { nombre, apellido, correo, password })
+        const response = await api.post('/auth/register', { nombre, apellido, correo, password, nombre_usuario })
         const { user, token } = response.data.data
 
         this.user = user
