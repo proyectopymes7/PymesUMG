@@ -1,6 +1,9 @@
 const { body, validationResult } = require('express-validator');
 const Calificacion = require('../models/Calificacion');
+const Emprendimiento = require('../models/Emprendimiento');
+const User = require('../models/User');
 const logger = require('../utils/logger');
+const { sendNewReview } = require('../utils/EmailService');
 
 const createCalificacion = async (req, res) => {
     try {
@@ -36,10 +39,20 @@ const createCalificacion = async (req, res) => {
             comentario
         });
 
-        logger.info('Calificación creada', {
-            userId: id_usuario,
-            emprendimientoId: id_emprendimiento,
-        });
+        logger.info('Calificación creada', { userId: id_usuario, emprendimientoId: id_emprendimiento });
+
+        // Notificar al dueño del negocio por email
+        try {
+            const emp = await Emprendimiento.findById(id_emprendimiento);
+            if (emp) {
+                const owner = await User.findById(emp.id_usuario);
+                if (owner && owner.correo) {
+                    await sendNewReview(owner.correo, owner.nombre, emp.nombre, puntuacion, comentario);
+                }
+            }
+        } catch (emailErr) {
+            logger.warn('No se pudo enviar email de reseña:', emailErr.message);
+        }
 
         res.status(201).json({
             success: true,

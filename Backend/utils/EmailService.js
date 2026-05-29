@@ -177,4 +177,32 @@ const sendNewBusinessRequest = async (nombreNegocio, nombreUsuario, correoUsuari
   })
 }
 
-module.exports = { sendBusinessApproved, sendBusinessRejected, sendPasswordReset, sendNewBusinessRequest }
+const sendNewReview = async (correoEmprendedor, nombreEmprendedor, nombreNegocio, puntuacion, comentario) => {
+  const estrellas = '★'.repeat(puntuacion) + '☆'.repeat(5 - puntuacion)
+  const inner = `
+    <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#003049;">⭐ Nueva reseña en tu negocio</p>
+    <p style="color:#64748b;font-size:11px;margin:0 0 14px;padding-bottom:14px;border-bottom:1px solid #f0f4f8;">Alguien dejó una reseña en <strong>${nombreNegocio}</strong>.</p>
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
+      <tr>
+        <td style="padding:6px 0;border-bottom:1px solid #f0f4f8;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;width:38%;">Calificación</td>
+        <td style="padding:6px 0;border-bottom:1px solid #f0f4f8;color:#f59e0b;font-size:16px;font-weight:700;">${estrellas} (${puntuacion}/5)</td>
+      </tr>
+      ${comentario ? `<tr>
+        <td style="padding:6px 0;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;">Comentario</td>
+        <td style="padding:6px 0;color:#003049;font-size:11px;">"${comentario}"</td>
+      </tr>` : ''}
+    </table>
+    <div style="text-align:center;margin-bottom:4px;">
+      <a href="${process.env.FRONTEND_URL}" style="${btnStyle('#C1121F')}">Ver mi negocio</a>
+    </div>
+    ${footer}
+  `
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: correoEmprendedor,
+    subject: `Nueva reseña en "${nombreNegocio}" — ${estrellas}`,
+    html: wrapWithBg(inner)
+  })
+}
+
+module.exports = { sendBusinessApproved, sendBusinessRejected, sendPasswordReset, sendNewBusinessRequest, sendNewReview }
