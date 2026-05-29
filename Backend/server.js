@@ -14,6 +14,8 @@ const publicacionesRoutes = require('./routes/publicaciones');
 const estadisticasRoutes = require('./routes/estadisticas');
 const valoracionesRoutes = require('./routes/valoraciones');
 const sugerenciasRoutes = require('./routes/sugerencias');
+const calificacionesRoutes = require('./routes/calificaciones');
+const aiRoutes = require('./routes/ai');
 
 const errorHandler = require('./middleware/errorHandler');
 const { rateLimiterMiddleware } = require('./middleware/rateLimiter');
@@ -126,6 +128,8 @@ app.use('/api/publicaciones', publicacionesRoutes);
 app.use('/api/estadisticas', estadisticasRoutes);
 app.use('/api/valoraciones', valoracionesRoutes);
 app.use('/api/sugerencias', sugerenciasRoutes);
+app.use('/api/calificaciones', calificacionesRoutes);
+app.use('/api/ai', aiRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -160,6 +164,100 @@ app.listen(PORT, async () => {
     logger.info('EmprendimientoCategorias table ready');
   } catch (err) {
     logger.error('Failed to ensure EmprendimientoCategorias table:', err.message);
+  }
+
+  // Ensure CALIFICACIONES table exists with all columns
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'CALIFICACIONES')
+      CREATE TABLE CALIFICACIONES (
+        id_calificacion   INT IDENTITY(1,1) PRIMARY KEY,
+        id_usuario        INT NOT NULL,
+        id_emprendimiento INT NOT NULL,
+        puntuacion        INT NOT NULL,
+        comentario        NVARCHAR(MAX) NULL,
+        fecha_calificacion DATETIME DEFAULT GETDATE() NULL,
+        FOREIGN KEY (id_usuario)        REFERENCES Usuarios(id_usuario),
+        FOREIGN KEY (id_emprendimiento) REFERENCES Emprendimientos(id_emprendimiento) ON DELETE CASCADE
+      )
+    `);
+    // Add missing columns to existing table
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CALIFICACIONES') AND name = 'comentario')
+        ALTER TABLE CALIFICACIONES ADD comentario NVARCHAR(MAX) NULL;
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('CALIFICACIONES') AND name = 'fecha_calificacion')
+        ALTER TABLE CALIFICACIONES ADD fecha_calificacion DATETIME NULL;
+    `);
+    logger.info('CALIFICACIONES table ready');
+  } catch (err) {
+    logger.error('Failed to ensure CALIFICACIONES table:', err.message);
+  }
+
+  // Ensure IMAGENES_PRODUCTO table exists
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'IMAGENES_PRODUCTO')
+      CREATE TABLE IMAGENES_PRODUCTO (
+        id_imagen_producto INT IDENTITY(1,1) PRIMARY KEY,
+        id_producto        INT NOT NULL,
+        url                NVARCHAR(500) NOT NULL,
+        descripcion        NVARCHAR(200) NULL,
+        orden              INT DEFAULT 0,
+        fecha_subida       DATETIME DEFAULT GETDATE(),
+        FOREIGN KEY (id_producto) REFERENCES ProductosServicios(id_producto) ON DELETE CASCADE
+      )
+    `);
+    logger.info('IMAGENES_PRODUCTO table ready');
+  } catch (err) {
+    logger.error('Failed to ensure IMAGENES_PRODUCTO table:', err.message);
+  }
+
+  // Add foto_perfil column to Usuarios if it doesn't exist
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (
+        SELECT * FROM sys.columns
+        WHERE object_id = OBJECT_ID('Usuarios') AND name = 'foto_perfil'
+      )
+      ALTER TABLE Usuarios ADD foto_perfil NVARCHAR(500) NULL
+    `);
+    logger.info('foto_perfil column ready');
+  } catch (err) {
+    logger.error('Failed to add foto_perfil column:', err.message);
+  }
+
+  // Add nombre_usuario column to Usuarios if it doesn't exist
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (
+        SELECT * FROM sys.columns
+        WHERE object_id = OBJECT_ID('Usuarios') AND name = 'nombre_usuario'
+      )
+      ALTER TABLE Usuarios ADD nombre_usuario NVARCHAR(50) NULL
+    `);
+    logger.info('nombre_usuario column ready');
+  } catch (err) {
+    logger.error('Failed to add nombre_usuario column:', err.message);
+  }
+
+  // Add social media columns to Emprendimientos if they don't exist
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Emprendimientos') AND name = 'instagram')
+        ALTER TABLE Emprendimientos ADD instagram NVARCHAR(200) NULL;
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Emprendimientos') AND name = 'facebook')
+        ALTER TABLE Emprendimientos ADD facebook NVARCHAR(200) NULL;
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Emprendimientos') AND name = 'website')
+        ALTER TABLE Emprendimientos ADD website NVARCHAR(200) NULL;
+    `);
+    logger.info('Social media columns ready');
+  } catch (err) {
+    logger.error('Failed to add social columns:', err.message);
   }
 
   // Drop any CHECK constraint on estado so ACTIVO/INACTIVO are accepted

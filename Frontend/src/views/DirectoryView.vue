@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import BusinessCard from '../components/business/BusinessCard.vue'
-import { getAllBusinesses, getCategories } from '../services/businessService'
+import { getAllBusinesses, getCategories, getNearbyBusinesses } from '../services/businessService'
 
 const route = useRoute()
 const router = useRouter()
@@ -60,6 +60,28 @@ const municipalities = computed(() => {
 
 const allBusinesses = ref([])
 const categories = ref([])
+const sortBy = ref('default') // 'default' | 'mejor_valorado' | 'cercano'
+const nearbyMap = ref({}) // id → distancia_km
+const loadingNearby = ref(false)
+
+const requestNearby = () => {
+  if (!navigator.geolocation) return
+  loadingNearby.value = true
+  navigator.geolocation.getCurrentPosition(
+    async ({ coords }) => {
+      try {
+        const list = await getNearbyBusinesses(coords.latitude, coords.longitude, 50)
+        const map = {}
+        list.forEach(b => { map[b.id] = b.distancia_km })
+        nearbyMap.value = map
+        sortBy.value = 'cercano'
+      } catch { /* silent */ } finally {
+        loadingNearby.value = false
+      }
+    },
+    () => { loadingNearby.value = false }
+  )
+}
 
 const normalize = (str) => {
   if (!str) return ''
@@ -79,15 +101,26 @@ const toggleCategory = (cat) => {
 const filteredBusinesses = computed(() => {
   const keyword = normalize(searchKeyword.value)
   const barrioQuery = normalize(searchBarrio.value)
-  return allBusinesses.value.filter(b => {
+
+  let list = allBusinesses.value.filter(b => {
     const matchDept     = selectedDept.value === 'Todas' || normalize(b.dept) === normalize(selectedDept.value)
     const matchMuni     = selectedMuni.value === 'Todas' || normalize(b.muni) === normalize(selectedMuni.value)
     const matchBarrio   = !barrioQuery || normalize(b.localidad).includes(barrioQuery)
     const matchCategory = selectedCategories.value.length === 0 ||
       selectedCategories.value.some(c => (b.categorias || [b.category]).map(normalize).includes(normalize(c)))
     const matchKeyword  = !keyword || normalize(b.name).includes(keyword) || normalize(b.description).includes(keyword)
-    return matchDept && matchMuni && matchBarrio && matchCategory && matchKeyword
+    // Si está en modo "cercano", solo mostrar los que tienen distancia calculada
+    const matchNearby   = sortBy.value !== 'cercano' || nearbyMap.value[b.id] !== undefined
+    return matchDept && matchMuni && matchBarrio && matchCategory && matchKeyword && matchNearby
   })
+
+  if (sortBy.value === 'mejor_valorado') {
+    list = [...list].sort((a, b) => (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0))
+  } else if (sortBy.value === 'cercano') {
+    list = [...list].sort((a, b) => (nearbyMap.value[a.id] ?? 999) - (nearbyMap.value[b.id] ?? 999))
+  }
+
+  return list
 })
 
 const toggleFilters = () => { if (!isDesktop.value) isFilterOpen.value = !isFilterOpen.value }
@@ -105,12 +138,10 @@ onMounted(async () => {
   window.addEventListener('resize', updateView)
   updateView()
 
-  // ── Leer parámetros que vienen del buscador del Home ──
   if (route.query.q) {
     searchKeyword.value = route.query.q
   }
   if (route.query.loc) {
-    // Buscar coincidencia normalizando para ignorar tildes/mayúsculas
     const match = Object.keys(locationsData).find(
       d => normalize(d) === normalize(route.query.loc)
     )
@@ -133,11 +164,15 @@ onMounted(async () => {
     <div class="container mx-auto px-4 md:px-6 pt-32 pb-12">
 
       <!-- Header -->
-      <div class="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
+      <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-6">
         <div>
           <h1 class="text-4xl md:text-5xl font-black text-fiery-navy font-outfit">Nuestro <span class="text-fiery-red">Directorio</span></h1>
           <p class="text-slate-500 font-medium mt-2">Explora los mejores negocios de toda Guatemala</p>
         </div>
+      </div>
+
+
+      <div class="mb-4">
         <button
           v-if="!isDesktop"
           @click="toggleFilters"
@@ -209,8 +244,11 @@ onMounted(async () => {
                     <svg class="w-4 h-4 shrink-0 ml-2 transition-transform" :class="categoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                   </button>
 
-                  <!-- Dropdown list -->
-                  <div v-if="categoryDropdownOpen" class="mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
+                  <!-- ✅ Dropdown list con scroll interno -->
+                  <div
+                    v-if="categoryDropdownOpen"
+                    class="mt-2 bg-white border border-slate-200 rounded-2xl shadow-lg category-scroll"
+                  >
                     <!-- Todas -->
                     <button
                       @click="toggleCategory('Todas')"
@@ -250,6 +288,29 @@ onMounted(async () => {
                   </div>
                 </div>
 
+                <!-- Ordenar -->
+                <div class="pt-4 border-t border-slate-200">
+                  <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ordenar por</label>
+                  <div class="space-y-2">
+                    <button @click="sortBy = 'default'"
+                      :class="['w-full px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border text-left', sortBy === 'default' ? 'bg-fiery-navy text-white border-fiery-navy' : 'bg-white text-slate-500 border-slate-200 hover:border-fiery-navy hover:text-fiery-navy']">
+                      Predeterminado
+                    </button>
+                    <button @click="sortBy = 'mejor_valorado'"
+                      :class="['w-full px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border flex items-center gap-2 text-left', sortBy === 'mejor_valorado' ? 'bg-fiery-red text-white border-fiery-red' : 'bg-white text-slate-500 border-slate-200 hover:border-fiery-red hover:text-fiery-red']">
+                      <svg class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                      Mejor valorado
+                    </button>
+                    <button @click="sortBy === 'cercano' ? sortBy = 'default' : requestNearby()"
+                      :disabled="loadingNearby"
+                      :class="['w-full px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all border flex items-center gap-2 text-left disabled:opacity-60', sortBy === 'cercano' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-600 hover:text-emerald-600']">
+                      <svg v-if="loadingNearby" class="animate-spin w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      <svg v-else class="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                      {{ sortBy === 'cercano' ? 'Cerca de mí ✓' : 'Cerca de mí' }}
+                    </button>
+                  </div>
+                </div>
+
                 <!-- Reset -->
                 <button
                   @click="resetFilters"
@@ -273,11 +334,16 @@ onMounted(async () => {
           </div>
 
           <div v-if="filteredBusinesses.length > 0" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            <BusinessCard v-for="business in filteredBusinesses" :key="business.id" :business="business" />
+            <div v-for="business in filteredBusinesses" :key="business.id" class="relative">
+              <span v-if="sortBy === 'cercano' && nearbyMap[business.id] !== undefined"
+                class="absolute top-3 right-3 z-10 bg-fiery-navy text-white text-[10px] font-black px-2 py-1 rounded-full shadow">
+                📍 {{ nearbyMap[business.id] }} km
+              </span>
+              <BusinessCard :business="business" />
+            </div>
           </div>
 
           <div v-else class="bg-white rounded-[3rem] p-16 text-center border border-slate-100">
-           
             <h3 class="text-3xl font-black text-fiery-navy mb-2 font-outfit uppercase">Sin resultados</h3>
             <p class="text-slate-400 mb-8 font-medium">
               No encontramos negocios
@@ -300,4 +366,24 @@ onMounted(async () => {
 .slide-fade-enter-active, .slide-fade-leave-active { transition: all 0.4s ease; }
 .slide-fade-enter-from, .slide-fade-leave-to { transform: translateX(-20px); opacity: 0; }
 select { appearance: none; }
+
+/* ✅ Dropdown de categorías con scroll interno */
+.category-scroll {
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain; /* evita que el scroll se propague a la página */
+}
+.category-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.category-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.category-scroll::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+.category-scroll::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
 </style>

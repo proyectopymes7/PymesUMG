@@ -18,6 +18,7 @@
   "author": "PYMES Chiquimula Team",
   "license": "MIT",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@azure/storage-blob": "^12.31.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -29,7 +30,10 @@
     "jsonwebtoken": "^9.0.2",
     "mssql": "^10.0.2",
     "multer": "^2.1.1",
+    "nodemailer": "^8.0.9",
+    "openai": "^6.39.1",
     "rate-limiter-flexible": "^4.0.1",
+    "sharp": "^0.34.5",
     "tedious": "^16.6.1",
     "uuid": "^14.0.0",
     "winston": "^3.11.0"

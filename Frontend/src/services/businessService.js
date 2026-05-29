@@ -14,7 +14,7 @@ const mapBusinessData = (b) => {
     category: cats[0] || 'General',
     categorias: cats,
     categorias_ids: catIds,
-    rating: b.rating_promedio ? Number(b.rating_promedio).toFixed(1) : 4.5,
+    rating: b.rating_promedio ? Number(b.rating_promedio).toFixed(1) : null,
     reviewCount: b.vistas || 0,
     description: b.descripcion,
     dept: b.departamento || '',
@@ -25,8 +25,8 @@ const mapBusinessData = (b) => {
     municipio: b.municipio || '',
     lat: b.latitud ? Number(b.latitud) : null,
     lng: b.longitud ? Number(b.longitud) : null,
-    image: b.logo_url || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80',
-    logo: b.logo_url || 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=400&auto=format&fit=crop',
+    image: b.logo_url || 'https://pymesadmin.blob.core.windows.net/logos/f13d047b-6eb2-49c8-beab-b73cbed4b13b.webp',
+    logo: b.logo_url || 'https://pymesadmin.blob.core.windows.net/logos/f13d047b-6eb2-49c8-beab-b73cbed4b13b.webp',
     estado: b.estado ? b.estado.toLowerCase() : 'activo',
     status: b.estado ? b.estado.toLowerCase() : 'activo',
     destacado: b.destacado === 1 || b.destacado === true,
@@ -35,9 +35,9 @@ const mapBusinessData = (b) => {
     hours: [{ day: 'Lunes - Domingo', time: b.horario || '8:00 AM - 5:00 PM' }],
     socials: {
       whatsapp: b.whatsapp ? `https://wa.me/${b.whatsapp}` : '',
-      instagram: '',
-      facebook: '',
-      website: ''
+      instagram: b.instagram || '',
+      facebook: b.facebook || '',
+      website: b.website || ''
     },
     products: [],
     services: [],
@@ -235,7 +235,7 @@ export const getBusinessProducts = async (businessId) => {
 
 export const getBusinessReviews = async (businessId) => {
   try {
-    const response = await api.get(`/valoraciones/emprendimiento/${businessId}`);
+    const response = await api.get(`/calificaciones/emprendimiento/${businessId}`);
     if (response.data.success && response.data.data) {
       return response.data.data;
     }
@@ -246,12 +246,100 @@ export const getBusinessReviews = async (businessId) => {
   }
 };
 
+export const getNearbyBusinesses = async (lat, lng, radio = 10) => {
+  try {
+    const response = await api.get('/emprendimientos/nearby/list', { params: { lat, lng, radio, limit: 12 } })
+    if (response.data.success && response.data.data) {
+      return response.data.data.map(b => ({ ...mapBusinessData(b), distancia_km: b.distancia_km }))
+    }
+    return []
+  } catch (error) {
+    console.error('Error fetching nearby businesses:', error)
+    return []
+  }
+}
+
+export const getProductImages = async (productId) => {
+  try {
+    const response = await api.get(`/imagenes/producto/${productId}`);
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error(`Error fetching images for product ${productId}:`, error);
+    return [];
+  }
+};
+
+// Comprime una imagen en el cliente antes de subirla.
+// Convierte a JPEG para garantizar compresión. maxWidth en px, quality 0-1.
+const compressImage = (file, maxWidth, quality) => new Promise((resolve) => {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    let { width, height } = img;
+    if (width > maxWidth) {
+      height = Math.round(height * maxWidth / width);
+      width = maxWidth;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+    canvas.toBlob(
+      blob => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })),
+      'image/jpeg',
+      quality
+    );
+  };
+  img.src = url;
+});
+
+// Sube imagen con compresión automática según el tipo.
+// tipo: 'logos' | 'imagenes' | 'perfiles'
+export const uploadImage = async (file, tipo = 'imagenes') => {
+  const limits = { logos: [600, 0.85], perfiles: [400, 0.85], imagenes: [1200, 0.80] };
+  const [maxW, quality] = limits[tipo] ?? [1200, 0.80];
+  const compressed = await compressImage(file, maxW, quality);
+
+  const fd = new FormData();
+  fd.append('imagen', compressed);
+  fd.append('tipo', tipo);
+  const response = await api.post('/imagenes/upload', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  if (!response.data?.url) throw new Error('No se recibió URL de la imagen');
+  return response.data.url;
+};
+
+export const uploadProductImage = async (file, productId) => {
+  const compressed = await compressImage(file, 800, 0.80);
+  const fd = new FormData();
+  fd.append('imagen', compressed);
+  const response = await api.post(`/imagenes/producto/${productId}`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  if (!response.data?.url) throw new Error('No se recibió URL de la imagen del producto');
+  return response.data.url;
+};
+
+export const deleteBusinessById = async (id) => {
+  await api.delete(`/emprendimientos/${id}`);
+};
+
+export const deleteReview = async (id_calificacion) => {
+  const response = await api.delete(`/calificaciones/${id_calificacion}`);
+  return response.data;
+};
+
 export const createReview = async ({ id_emprendimiento, comentario, calificacion }) => {
   try {
-    const response = await api.post('/valoraciones', {
+    const response = await api.post('/calificaciones', {
       id_emprendimiento,
       comentario,
-      calificacion
+      puntuacion: calificacion
     });
     return response.data;
   } catch (error) {

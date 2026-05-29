@@ -56,7 +56,7 @@ const createCalificacion = async (req, res) => {
 
 const getCalificacionesByEmprendimiento = async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id_emprendimiento || req.params.id;
         const calificaciones = await Calificacion.findByEmprendimiento(id);
         
         res.json({
@@ -74,20 +74,24 @@ const getCalificacionesByEmprendimiento = async (req, res) => {
 
 const deleteCalificacion = async (req, res) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id_calificacion || req.params.id;
+
+        const review = await Calificacion.findById(id);
+        if (!review) {
+            return res.status(404).json({ error: 'Reseña no encontrada' });
+        }
+
+        const isAdmin = req.user.id_rol === 1 || req.user.id_rol === 2;
+        if (!isAdmin && review.id_usuario !== req.user.id_usuario) {
+            return res.status(403).json({ error: 'No tienes permiso para eliminar esta reseña' });
+        }
 
         await Calificacion.delete(id);
 
-        res.json({
-            success: true,
-            message: 'Calificación eliminada exitosamente'
-        });
-    
+        res.json({ success: true, message: 'Calificación eliminada exitosamente' });
     } catch (error) {
         logger.error('Error eliminando calificación:', { error });
-        res.status(500).json({
-            error: 'Falló al eliminar la calificación'
-        });
+        res.status(500).json({ error: 'Falló al eliminar la calificación' });
     }
 };
 

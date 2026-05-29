@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
-import { getBusinessById, getBusinessProducts, getBusinessReviews, createReview } from '../services/businessService'
+import { getBusinessById, getBusinessProducts, getBusinessReviews, createReview, deleteReview, getProductImages } from '../services/businessService'
 import { useAuthStore } from '../stores/auth'
 
 const route = useRoute()
@@ -14,10 +14,61 @@ const services = ref([])
 const reviews = ref([])
 const showMapModal = ref(false)
 const showReviewModal = ref(false)
+const showProductModal = ref(false)
+const selectedProduct = ref(null)
+const productImages = ref([])
+const productImageIdx = ref(0)
+const productImagesCache = ref({})
+
+const DEFAULT_PRODUCT_IMG = 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?w=600&q=75&auto=format&fit=crop'
+const failedProductImgs = ref(new Set())
+
+const getCardThumbnail = (product) => {
+  if (product.tipo === 'servicio') return null
+  // 1. Cache de imágenes reales (prioridad máxima)
+  const cached = productImagesCache.value[product.id_producto]
+  if (cached?.length) return cached[0].url
+  // 2. URL directa del producto
+  if (product.imagen_url) return product.imagen_url
+  // 3. Si el fallback ya falló, mostrar placeholder
+  if (failedProductImgs.value.has(product.id_producto)) return null
+  // 4. Intentar imagen genérica de fallback
+  return DEFAULT_PRODUCT_IMG
+}
+
+const onProductImgError = (product) => {
+  failedProductImgs.value = new Set([...failedProductImgs.value, product.id_producto])
+}
+
+const openProductModal = (product) => {
+  selectedProduct.value = product
+  productImageIdx.value = 0
+  productImages.value = productImagesCache.value[product.id_producto] || []
+  showProductModal.value = true
+}
 const reviewForm = ref({ calificacion: 0, comentario: '', hoveredStar: 0 })
 const submittingReview = ref(false)
 const reviewError = ref('')
 const reviewSuccess = ref(false)
+const deletingReviewId = ref(null)
+
+const executeDeleteReview = async (review) => {
+  try {
+    await deleteReview(review.id_calificacion)
+    reviews.value = reviews.value.filter(r => r.id_calificacion !== review.id_calificacion)
+  } catch (error) {
+    console.error('Error eliminando reseña:', error)
+  } finally {
+    deletingReviewId.value = null
+  }
+}
+
+const averageRating = computed(() => {
+  if (!reviews.value.length) return null
+  const sum = reviews.value.reduce((acc, r) => acc + r.puntuacion, 0)
+  return (sum / reviews.value.length).toFixed(1)
+})
+const reviewCount = computed(() => reviews.value.length)
 
 const mapUrl = computed(() => {
   if (!business.value) return ''
@@ -63,6 +114,16 @@ onMounted(async () => {
     const all = await getBusinessProducts(route.params.id)
     products.value = all.filter(p => p.tipo !== 'servicio')
     services.value = all.filter(p => p.tipo === 'servicio')
+
+    // Precarga las imágenes reales de cada producto/servicio en paralelo
+    Promise.all(all.map(async (p) => {
+      try {
+        const imgs = await getProductImages(p.id_producto)
+        productImagesCache.value[p.id_producto] = imgs
+      } catch {
+        productImagesCache.value[p.id_producto] = []
+      }
+    }))
   } catch (error) {
     console.error('Error fetching products:', error)
   }
@@ -94,10 +155,6 @@ const submitReview = async () => {
     reviewError.value = 'Debes seleccionar una calificación'
     return
   }
-  if (!reviewForm.value.comentario.trim()) {
-    reviewError.value = 'Debes escribir un comentario'
-    return
-  }
   submittingReview.value = true
   reviewError.value = ''
   try {
@@ -107,11 +164,12 @@ const submitReview = async () => {
       calificacion: reviewForm.value.calificacion
     })
     reviews.value.unshift({
-      id: Date.now(),
-      usuario_nombre: authStore.userFullName,
-      calificacion: reviewForm.value.calificacion,
+      id_calificacion: Date.now(),
+      usuario_nombre: authStore.user?.nombre,
+      usuario_apellido: authStore.user?.apellido,
+      puntuacion: reviewForm.value.calificacion,
       comentario: reviewForm.value.comentario,
-      fecha: new Date().toISOString()
+      fecha_calificacion: new Date().toISOString()
     })
     reviewSuccess.value = true
     setTimeout(() => closeReviewModal(), 2000)
@@ -149,11 +207,19 @@ const submitReview = async () => {
               <img :src="business.logo" :alt="business.name" class="w-full h-full object-cover rounded-[1.8rem]" />
             </div>
             <div class="bg-fiery-navy rounded-[2rem] p-4 md:p-6 text-center text-white w-full max-w-[200px] md:max-w-none">
-              <div class="text-2xl md:text-4xl font-black mb-1">{{ business.rating }}</div>
-              <div class="flex justify-center text-yellow-400 mb-1 md:mb-2">
-                <svg v-for="i in 5" :key="i" class="w-4 h-4 md:w-5 md:h-5" :class="i <= Math.floor(business.rating) ? 'fill-current' : 'text-white/20'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
-              </div>
-              <div class="text-[10px] md:text-xs font-bold text-fiery-cream/60 uppercase tracking-widest">{{ business.reviewCount }} reseñas</div>
+              <!-- Con reseñas: número + estrellas llenas -->
+              <template v-if="averageRating">
+                <div class="text-2xl md:text-4xl font-black mb-1">{{ averageRating }}</div>
+                <div class="flex justify-center text-yellow-400 mb-1 md:mb-2">
+                  <svg v-for="i in 5" :key="i" class="w-4 h-4 md:w-5 md:h-5" :class="i <= Math.floor(averageRating) ? 'fill-current' : 'text-white/20'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                </div>
+                <div class="text-[10px] md:text-xs font-bold text-fiery-cream/60 uppercase tracking-widest">{{ reviewCount }} reseñas</div>
+              </template>
+              <!-- Sin reseñas: solo una estrella vacía -->
+              <template v-else>
+                <svg class="w-8 h-8 md:w-10 md:h-10 mx-auto text-white/30" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                <div class="text-[10px] md:text-xs font-bold text-fiery-cream/40 uppercase tracking-widest mt-2">Sin reseñas</div>
+              </template>
             </div>
           </div>
 
@@ -204,23 +270,26 @@ const submitReview = async () => {
               <div class="h-1 flex-1 bg-fiery-cream rounded-full"></div>
             </h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
-              <div v-for="product in products" :key="product.id_producto" class="bg-white rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm group">
+              <div v-for="product in products" :key="product.id_producto" @click="openProductModal(product)" class="bg-white rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm group cursor-pointer hover:shadow-md hover:border-slate-200 transition-all">
                 <div class="h-48 md:h-64 overflow-hidden bg-slate-100">
                   <img
-                    v-if="product.imagen_url"
-                    :src="product.imagen_url"
+                    v-if="getCardThumbnail(product)"
+                    :src="getCardThumbnail(product)"
                     :alt="product.nombre"
                     class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    @error="onProductImgError(product)"
                   />
                   <div v-else class="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200">
                     <svg class="w-14 h-14 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
                   </div>
                 </div>
-                <div class="p-6 md:p-8">
-                  <div class="flex justify-between items-center mb-2 gap-2">
-                    <h3 class="text-xl md:text-2xl font-bold text-fiery-navy leading-tight">{{ product.nombre }}</h3>
-                    <span class="text-xl md:text-2xl font-black text-fiery-red whitespace-nowrap">{{ formatPrice(product) }}</span>
+                <div class="p-5 md:p-6">
+                  <div class="flex justify-between items-start gap-2 mb-1">
+                    <h3 class="text-lg md:text-xl font-bold text-fiery-navy leading-tight">{{ product.nombre }}</h3>
+                    <span v-if="formatPrice(product)" class="text-lg md:text-xl font-black text-fiery-red whitespace-nowrap">{{ formatPrice(product) }}</span>
                   </div>
+                  <p v-if="product.descripcion" class="text-slate-500 text-sm line-clamp-2 mt-1">{{ product.descripcion }}</p>
+                  <p class="text-[10px] text-fiery-red font-bold uppercase tracking-widest mt-3">Ver detalles →</p>
                 </div>
               </div>
             </div>
@@ -232,15 +301,16 @@ const submitReview = async () => {
               Servicios
               <div class="h-1 flex-1 bg-fiery-cream rounded-full"></div>
             </h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
-              <div v-for="service in services" :key="service.id_producto" class="flex justify-between items-center bg-white p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-slate-100 shadow-sm">
-                <div class="flex items-center gap-3 md:gap-4">
-                  <div class="w-8 h-8 md:w-10 md:h-10 bg-fiery-navy/5 rounded-lg flex items-center justify-center">
-                    <svg class="w-5 h-5 md:w-6 md:h-6 text-fiery-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8">
+              <div v-for="service in services" :key="service.id_producto" @click="openProductModal(service)" class="bg-white rounded-[2rem] md:rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-sm group cursor-pointer hover:shadow-md hover:border-slate-200 transition-all">
+                <div class="p-5 md:p-6">
+                  <div class="flex justify-between items-start gap-2 mb-1">
+                    <h3 class="text-lg md:text-xl font-bold text-fiery-navy leading-tight">{{ service.nombre }}</h3>
+                    <span v-if="formatPrice(service)" class="text-lg md:text-xl font-black text-fiery-red whitespace-nowrap">{{ formatPrice(service) }}</span>
                   </div>
-                  <span class="font-bold text-fiery-navy text-base md:text-lg">{{ service.nombre }}</span>
+                  <p v-if="service.descripcion" class="text-slate-500 text-sm mt-1 line-clamp-2">{{ service.descripcion }}</p>
+                  <p class="text-[10px] text-fiery-red font-bold uppercase tracking-widest mt-3">Ver detalles →</p>
                 </div>
-                <span class="font-black text-fiery-red text-sm whitespace-nowrap ml-3">{{ formatPrice(service) }}</span>
               </div>
             </div>
           </div>
@@ -312,22 +382,39 @@ const submitReview = async () => {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div v-for="review in reviews" :key="review.id_valoracion || review.id" class="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div v-for="review in reviews" :key="review.id_calificacion" class="bg-white rounded-[2rem] p-6 md:p-8 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
                 <div class="flex justify-between items-start mb-4 md:mb-6">
                   <div class="flex items-center gap-3 md:gap-4">
-                    <div class="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl bg-fiery-navy text-white flex items-center justify-center font-black text-lg md:text-xl uppercase flex-shrink-0">
-                      {{ (review.usuario_nombre || '?').charAt(0) }}
+                    <div class="w-12 h-12 md:w-14 md:h-14 rounded-xl md:rounded-2xl overflow-hidden bg-fiery-navy text-white flex items-center justify-center font-black text-lg md:text-xl uppercase flex-shrink-0">
+                      <img v-if="review.usuario_foto" :src="review.usuario_foto" class="w-full h-full object-cover" :alt="review.usuario_nombre" />
+                      <span v-else>{{ (review.usuario_nombre || '?').charAt(0) }}</span>
                     </div>
                     <div>
-                      <h4 class="font-black text-fiery-navy text-base md:text-lg">{{ review.usuario_nombre || 'Usuario' }}</h4>
-                      <p class="text-slate-400 font-bold text-[10px] md:text-xs uppercase tracking-widest">{{ formatDate(review.fecha) }}</p>
+                      <h4 class="font-black text-fiery-navy text-base md:text-lg">{{ [review.usuario_nombre, review.usuario_apellido].filter(Boolean).join(' ') || 'Usuario' }}</h4>
+                      <p v-if="review.fecha_calificacion" class="text-slate-400 font-bold text-[10px] md:text-xs uppercase tracking-widest">{{ formatDate(review.fecha_calificacion) }}</p>
                     </div>
                   </div>
-                  <div class="flex text-yellow-400 flex-shrink-0">
-                    <svg v-for="i in 5" :key="i" class="w-4 h-4 md:w-5 md:h-5" :class="i <= review.calificacion ? 'fill-current' : 'text-slate-200'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <div class="flex text-yellow-400">
+                      <svg v-for="i in 5" :key="i" class="w-4 h-4 md:w-5 md:h-5" :class="i <= review.puntuacion ? 'fill-current' : 'text-slate-200'" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+                    </div>
+                    <button
+                      v-if="authStore.isAuthenticated && authStore.user?.id_usuario === review.id_usuario"
+                      @click="deletingReviewId = review.id_calificacion"
+                      class="p-1.5 rounded-lg text-slate-300 hover:text-fiery-red hover:bg-red-50 transition-colors"
+                      title="Eliminar mi reseña"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
                   </div>
                 </div>
-                <p class="text-slate-600 text-base md:text-lg italic">"{{ review.comentario }}"</p>
+                <p v-if="review.comentario" class="text-slate-600 text-base md:text-lg italic">"{{ review.comentario }}"</p>
+                <!-- Confirmación inline de eliminación -->
+                <div v-if="deletingReviewId === review.id_calificacion" class="mt-3 flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
+                  <span class="text-sm font-bold text-red-700 flex-1">¿Eliminar tu reseña?</span>
+                  <button @click="deletingReviewId = null" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
+                  <button @click="executeDeleteReview(review)" class="px-3 py-1.5 rounded-lg text-xs font-black text-white bg-fiery-red hover:bg-red-700 transition-colors">Eliminar</button>
+                </div>
               </div>
             </div>
 
@@ -336,6 +423,68 @@ const submitReview = async () => {
 
       </div>
     </div>
+
+    <!-- ── Modal Detalle de Producto ── -->
+    <transition name="modal-fade">
+      <div v-if="showProductModal && selectedProduct"
+        class="fixed inset-0 bg-black/60 z-[250] flex items-center justify-center p-4"
+        @click.self="showProductModal = false">
+        <div class="bg-white rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto shadow-2xl flex flex-col">
+
+          <!-- Imagen / carrusel (solo para productos) -->
+          <div v-if="selectedProduct.tipo !== 'servicio'" class="relative bg-slate-100 rounded-t-3xl overflow-hidden" style="min-height:220px">
+            <template v-if="productImages.length > 0">
+              <img :src="productImages[productImageIdx].url" :alt="selectedProduct.nombre"
+                class="w-full object-cover" style="max-height:320px;min-height:220px" />
+              <div v-if="productImages.length > 1" class="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                <button v-for="(_, i) in productImages" :key="i" @click="productImageIdx = i"
+                  class="w-2 h-2 rounded-full transition-colors"
+                  :class="i === productImageIdx ? 'bg-white' : 'bg-white/40'"></button>
+              </div>
+              <button v-if="productImageIdx > 0" @click="productImageIdx--"
+                class="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors">
+                <svg class="w-4 h-4 text-fiery-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/></svg>
+              </button>
+              <button v-if="productImageIdx < productImages.length - 1" @click="productImageIdx++"
+                class="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-white/80 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition-colors">
+                <svg class="w-4 h-4 text-fiery-navy" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/></svg>
+              </button>
+            </template>
+            <template v-else-if="selectedProduct.imagen_url">
+              <img :src="selectedProduct.imagen_url" :alt="selectedProduct.nombre"
+                class="w-full object-cover" style="max-height:320px;min-height:220px" />
+            </template>
+            <template v-else>
+              <img :src="DEFAULT_PRODUCT_IMG" :alt="selectedProduct.nombre"
+                class="w-full object-cover" style="max-height:320px;min-height:220px" />
+            </template>
+            <button @click="showProductModal = false"
+              class="absolute top-3 right-3 w-8 h-8 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white rounded-full flex items-center justify-center font-bold text-lg transition-colors leading-none">×</button>
+          </div>
+          <!-- Botón cerrar para servicios (sin imagen) -->
+          <div v-else class="flex justify-end p-4">
+            <button @click="showProductModal = false"
+              class="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-full flex items-center justify-center font-bold text-lg transition-colors leading-none">×</button>
+          </div>
+
+          <!-- Contenido -->
+          <div class="p-6 space-y-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full"
+                  :class="selectedProduct.tipo === 'servicio' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'">
+                  {{ selectedProduct.tipo === 'servicio' ? 'Servicio' : 'Producto' }}
+                </span>
+                <h2 class="text-2xl font-black text-fiery-navy mt-2">{{ selectedProduct.nombre }}</h2>
+              </div>
+              <span v-if="formatPrice(selectedProduct)" class="text-2xl font-black text-fiery-red whitespace-nowrap mt-1">{{ formatPrice(selectedProduct) }}</span>
+            </div>
+            <p v-if="selectedProduct.descripcion" class="text-slate-600 text-sm leading-relaxed">{{ selectedProduct.descripcion }}</p>
+            <p v-else class="text-slate-400 text-sm italic">Sin descripción</p>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- ── Modal Mapa Fullscreen ── -->
     <transition name="modal-fade">
@@ -441,7 +590,7 @@ const submitReview = async () => {
             </button>
             <button
               @click="submitReview"
-              :disabled="submittingReview || reviewForm.calificacion === 0 || !reviewForm.comentario.trim()"
+              :disabled="submittingReview || reviewForm.calificacion === 0"
               class="w-full sm:w-auto px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest bg-fiery-red hover:bg-fiery-darkred text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <svg v-if="submittingReview" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">

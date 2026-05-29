@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
@@ -139,6 +139,11 @@ const onBlur = () => {
 }
 
 onMounted(async () => {
+  // Esperar al siguiente frame para que el contenedor esté visible
+  // (necesario cuando se monta dentro de un modal con animación)
+  await nextTick()
+  await new Promise(r => setTimeout(r, 50))
+
   try {
     await loadGoogleMaps()
   } catch (e) {
@@ -167,6 +172,12 @@ onMounted(async () => {
     map: hasInitial ? map : null,
     gmpDraggable: !props.readonly
   })
+
+  // Forzar redibujado de tiles cuando el contenedor cambia tamaño
+  // (soluciona mapa en blanco dentro del modal de admin)
+  new ResizeObserver(() => {
+    if (map) window.google.maps.event.trigger(map, 'resize')
+  }).observe(mapContainer.value)
 
   if (!props.readonly) {
     marker.addListener('dragend', async () => {

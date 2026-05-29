@@ -2,6 +2,7 @@ const { body, validationResult } = require('express-validator');
 const Emprendimiento = require('../models/Emprendimiento');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { sendBusinessApproved, sendBusinessRejected, sendNewBusinessRequest } = require('../utils/EmailService');
 
 const isAdmin = (user) => user && (user.id_rol === 1 || user.id_rol === 2);
 const isOwner = (user, emp) => user && user.id_usuario === emp.id_usuario;
@@ -24,10 +25,22 @@ const createEmprendimiento = async (req, res) => {
     const newEmprendimiento = await Emprendimiento.create(emprendimientoData);
     const fullEmprendimiento = await Emprendimiento.findById(newEmprendimiento.id_emprendimiento);
 
-    logger.info(`Emprendimiento created: ${fullEmprendimiento.nombre}`, { 
+    logger.info(`Emprendimiento created: ${fullEmprendimiento.nombre}`, {
       userId: req.user.id_usuario,
       emprendimientoId: newEmprendimiento.id_emprendimiento
     });
+
+    // Notificar al admin sobre la nueva solicitud
+    try {
+      await sendNewBusinessRequest(
+        fullEmprendimiento.nombre,
+        req.user.nombre,
+        req.user.correo
+      );
+      logger.info(`New business request email sent for: ${fullEmprendimiento.nombre}`);
+    } catch (emailErr) {
+      logger.warn(`Failed to send new request email: ${emailErr.message}`);
+    }
 
     res.status(201).json({
       success: true,
@@ -145,17 +158,40 @@ const updateEmprendimiento = async (req, res) => {
     const updateData = req.body;
 
     // Auto-promote Visitante (4) → Emprendedor (3) when business is approved
-    if (updateData.estado === 'APROBADO') {
+    const estadoNorm = updateData.estado?.toLowerCase()
+    if (estadoNorm === 'activo' || estadoNorm === 'aprobado') {
       const owner = await User.findById(emprendimiento.id_usuario);
       if (owner && owner.id_rol === 4) {
         await User.updateRole(emprendimiento.id_usuario, 3);
-        logger.info(`User promoted to Emprendedor: ${owner.correo}`);
+        logger.info(`User promoted to Emprendedor: ${owner.nombre_usuario || owner.correo}`);
+      }
+      // Send approval email if user has email
+      if (owner && owner.correo) {
+        try {
+          await sendBusinessApproved(owner.correo, owner.nombre, emprendimiento.nombre);
+          logger.info(`Approval email sent to: ${owner.correo}`);
+        } catch (emailErr) {
+          logger.warn(`Failed to send approval email: ${emailErr.message}`);
+        }
+      }
+    }
+
+    // Send rejection email
+    if (updateData.estado === 'rechazado') {
+      const owner = await User.findById(emprendimiento.id_usuario);
+      if (owner) {
+        try {
+          await sendBusinessRejected(owner.correo, owner.nombre, emprendimiento.nombre);
+          logger.info(`Rejection email sent to: ${owner.correo}`);
+        } catch (emailErr) {
+          logger.warn(`Failed to send rejection email: ${emailErr.message}`);
+        }
       }
     }
 
     const updatedEmprendimiento = await Emprendimiento.update(id, updateData);
 
-    logger.info(`Emprendimiento updated: ${emprendimiento.nombre}`, { 
+    logger.info(`Emprendimiento updated: ${emprendimiento.nombre}`, {
       userId: req.user.id_usuario,
       emprendimientoId: id
     });
@@ -195,7 +231,7 @@ const deleteEmprendimiento = async (req, res) => {
 
     await Emprendimiento.delete(id);
 
-    logger.info(`Emprendimiento deleted: ${emprendimiento.nombre}`, { 
+    logger.info(`Emprendimiento deleted: ${emprendimiento.nombre}`, {
       userId: req.user.id_usuario,
       emprendimientoId: id
     });
@@ -264,7 +300,7 @@ const getMyEmprendimientos = async (req, res) => {
     }
 
     const emprendimientos = await Emprendimiento.findAll(filters);
-    const total = await Emprendimiento.count({ 
+    const total = await Emprendimiento.count({
       id_usuario: req.user.id_usuario,
       estado: filters.estado
     });
@@ -331,7 +367,7 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado'])
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado', 'APROBADO'])
       .withMessage('Estado inválido'),
     body('departamento').optional().trim().isLength({ max: 100 }).withMessage('Departamento max 100 chars'),
     body('municipio').optional().trim().isLength({ max: 100 }).withMessage('Municipio max 100 chars'),
@@ -376,7 +412,7 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado'])
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado', 'APROBADO'])
       .withMessage('Estado inválido'),
     body('departamento').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
     body('municipio').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),

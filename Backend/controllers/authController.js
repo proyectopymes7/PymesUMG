@@ -1,8 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { sendPasswordReset } = require('../utils/EmailService');
 
 const generateToken = (userId) => {
   return jwt.sign(
@@ -22,15 +24,26 @@ const register = async (req, res) => {
       });
     }
 
-    const { nombre, apellido, correo, password, id_rol = 4 } = req.body; // Default: Visitante
+    const { nombre, apellido, correo, password, nombre_usuario } = req.body;
+    const id_rol = 4;
 
-    // Check if user already exists
-    const existingUser = await User.findByEmail(correo);
-    if (existingUser) {
-      return res.status(409).json({
-        error: 'Registration failed',
-        message: 'Email already registered'
-      });
+    // nombre_usuario is required for manual registration
+    if (!nombre_usuario) {
+      return res.status(400).json({ error: 'Registration failed', message: 'El nombre de usuario es requerido' });
+    }
+
+    // Check if username is taken
+    const existingUsername = await User.findByUsername(nombre_usuario);
+    if (existingUsername) {
+      return res.status(409).json({ error: 'Registration failed', message: 'El nombre de usuario ya está en uso' });
+    }
+
+    // Check email uniqueness only if provided
+    if (correo) {
+      const existingUser = await User.findByEmail(correo);
+      if (existingUser) {
+        return res.status(409).json({ error: 'Registration failed', message: 'El correo ya está registrado' });
+      }
     }
 
     // Hash password
@@ -43,6 +56,7 @@ const register = async (req, res) => {
       apellido,
       correo,
       password_hash,
+      nombre_usuario: nombre_usuario || null,
       id_rol,
       activo: 1
     };
@@ -83,14 +97,14 @@ const login = async (req, res) => {
       });
     }
 
-    const { correo, password } = req.body;
+    const { identifier, password } = req.body;
 
-    // Find user by email
-    const user = await User.findByEmail(correo);
+    // Find user by email or username
+    const user = await User.findByIdentifier(identifier);
     if (!user) {
       return res.status(401).json({
         error: 'Login failed',
-        message: 'Invalid credentials'
+        message: 'Credenciales inválidas'
       });
     }
 
@@ -121,10 +135,10 @@ const login = async (req, res) => {
       if (attempts >= 5) {
         const blockUntil = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
         await User.blockUser(user.id_usuario, blockUntil);
-        
-        logger.warn(`User blocked due to failed attempts: ${correo}`, { 
-          ip: req.ip, 
-          attempts 
+
+        logger.warn(`User blocked due to failed attempts: ${identifier}`, {
+          ip: req.ip,
+          attempts
         });
 
         return res.status(401).json({
@@ -135,7 +149,7 @@ const login = async (req, res) => {
 
       return res.status(401).json({
         error: 'Login failed',
-        message: 'Invalid credentials'
+        message: 'Credenciales inválidas'
       });
     }
 
@@ -150,7 +164,7 @@ const login = async (req, res) => {
     // Remove password from response
     delete user.password_hash;
 
-    logger.info(`User logged in: ${correo}`, { ip: req.ip });
+    logger.info(`User logged in: ${identifier}`, { ip: req.ip });
 
     res.json({
       success: true,
@@ -200,7 +214,7 @@ const googleLogin = async (req, res) => {
         id_rol: 4, // Default: Visitante
         activo: 1
       };
-      
+
       const newUserResult = await User.create(userData);
       user = await User.findById(newUserResult.id_usuario);
       logger.info(`New user created via Google: ${email}`);
@@ -259,11 +273,12 @@ const updateProfile = async (req, res) => {
       });
     }
 
-    const { nombre, apellido } = req.body;
+    const { nombre, apellido, foto_perfil } = req.body;
     const updateData = {};
 
     if (nombre !== undefined) updateData.nombre = nombre;
     if (apellido !== undefined) updateData.apellido = apellido;
+    if (foto_perfil !== undefined) updateData.foto_perfil = foto_perfil;
 
     const updatedUser = await User.update(req.user.id_usuario, updateData);
     delete updatedUser.password_hash;
@@ -335,6 +350,80 @@ const changePassword = async (req, res) => {
   }
 };
 
+// ── Recuperar contraseña ────────────────────────────────
+const forgotPassword = async (req, res) => {
+  try {
+    const { correo } = req.body;
+    if (!correo) {
+      return res.status(400).json({ error: 'El correo es requerido' });
+    }
+
+    const user = await User.findByEmail(correo);
+
+    // Siempre responder igual para no revelar si el correo existe
+    if (!user) {
+      return res.json({ success: true, message: 'Si el correo existe, recibirás un enlace de recuperación.' });
+    }
+
+    // Generar token de reset (expira en 1 hora)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000);
+
+    await User.update(user.id_usuario, {
+      reset_token: resetToken,
+      reset_token_expires: resetExpires
+    });
+
+    await sendPasswordReset(user.correo, user.nombre, resetToken);
+
+    logger.info(`Password reset requested: ${correo}`, { ip: req.ip });
+
+    res.json({ success: true, message: 'Si el correo existe, recibirás un enlace de recuperación.' });
+  } catch (error) {
+    logger.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Error al procesar la solicitud' });
+  }
+};
+
+// ── Resetear contraseña con token ───────────────────────
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token y nueva contraseña son requeridos' });
+    }
+
+    if (newPassword.length < 8 || !/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      return res.status(400).json({
+        error: 'La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número'
+      });
+    }
+
+    const user = await User.findByResetToken(token);
+
+    if (!user || !user.reset_token_expires || new Date(user.reset_token_expires) < new Date()) {
+      return res.status(400).json({ error: 'El enlace de recuperación es inválido o ha expirado' });
+    }
+
+    const saltRounds = 12;
+    const password_hash = await bcrypt.hash(newPassword, saltRounds);
+
+    await User.update(user.id_usuario, {
+      password_hash,
+      reset_token: null,
+      reset_token_expires: null
+    });
+
+    logger.info(`Password reset completed: ${user.correo}`, { ip: req.ip });
+
+    res.json({ success: true, message: 'Contraseña restablecida correctamente. Ya puedes iniciar sesión.' });
+  } catch (error) {
+    logger.error('Reset password error:', error);
+    res.status(500).json({ error: 'Error al restablecer la contraseña' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -342,30 +431,32 @@ module.exports = {
   getProfile,
   updateProfile,
   changePassword,
+  forgotPassword,
+  resetPassword,
   validateRegister: [
-    body('nombre')
+    body('nombre').trim().isLength({ min: 2, max: 50 }).withMessage('Nombre debe tener entre 2 y 50 caracteres'),
+    body('apellido').trim().isLength({ min: 2, max: 50 }).withMessage('Apellido debe tener entre 2 y 50 caracteres'),
+    body('nombre_usuario')
       .trim()
-      .isLength({ min: 2, max: 50 })
-      .withMessage('Nombre must be between 2 and 50 characters'),
-    body('apellido')
-      .trim()
-      .isLength({ min: 2, max: 50 })
-      .withMessage('Apellido must be between 2 and 50 characters'),
+      .isLength({ min: 3, max: 30 })
+      .withMessage('El usuario debe tener entre 3 y 30 caracteres')
+      .matches(/^[a-zA-Z0-9_]+$/)
+      .withMessage('Solo letras, números y guión bajo (_)'),
     body('correo')
+      .optional({ checkFalsy: true })
       .isEmail()
       .normalizeEmail()
-      .withMessage('Please provide a valid email'),
+      .withMessage('Correo inválido'),
     body('password')
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters long')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('Password must contain at least one uppercase letter, one lowercase letter, and one number')
+      .withMessage('La contraseña debe contener al menos una letra mayúscula, una minúscula, y un número')
   ],
   validateLogin: [
-    body('correo')
-      .isEmail()
-      .normalizeEmail()
-      .withMessage('Please provide a valid email'),
+    body('identifier')
+      .notEmpty()
+      .withMessage('Ingresa tu correo o nombre de usuario'),
     body('password')
       .notEmpty()
       .withMessage('Password is required')
@@ -380,7 +471,11 @@ module.exports = {
       .optional()
       .trim()
       .isLength({ min: 2, max: 50 })
-      .withMessage('Apellido must be between 2 and 50 characters')
+      .withMessage('Apellido must be between 2 and 50 characters'),
+    body('foto_perfil')
+      .optional({ checkFalsy: true })
+      .isURL()
+      .withMessage('foto_perfil must be a valid URL')
   ],
   validateChangePassword: [
     body('currentPassword')
@@ -390,6 +485,6 @@ module.exports = {
       .isLength({ min: 8 })
       .withMessage('New password must be at least 8 characters long')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('New password must contain at least one uppercase letter, one lowercase letter, and one number')
+      .withMessage('New La contraseña debe contener al menos una letra mayúscula, una minúscula, y un número')
   ]
 };

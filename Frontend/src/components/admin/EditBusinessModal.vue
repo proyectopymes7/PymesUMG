@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { getRawCategories } from '../../services/businessService'
+import { getRawCategories, uploadProductImage } from '../../services/businessService'
 import api from '../../services/api'
 import LocationPicker from '../shared/LocationPicker.vue'
 
@@ -29,6 +29,7 @@ const loading = ref(false)
 const formData = ref({ socials: {} })
 const categories = ref([])
 const selectedCategorias = ref([])
+const categoryDropdownOpen = ref(false)
 
 // Horarios state
 const daysMap = {
@@ -57,35 +58,99 @@ const closeTime = ref('5:00 PM')
 
 // Products state
 const products = ref([])
+const productImagesCache = ref({})
 const loadingProducts = ref(false)
 const showProductForm = ref(false)
 const editingProduct = ref(null)
-const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '' })
+const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
 const deletingId = ref(null)
 
-// Product Image State
-const productImageFile = ref(null)
-const productImagePreview = ref(null)
+const getProductThumbnail = (prod) => {
+  const cached = productImagesCache.value[prod.id_producto]
+  if (cached?.length) return cached[0].url
+  return prod.imagen_url || null
+}
 
-const handleProductImageChange = (e) => {
-  const file = e.target.files[0]
-  if (file) {
-    productImageFile.value = file
-    productImagePreview.value = URL.createObjectURL(file)
+// Product Image State
+const existingProductImages = ref([])
+const newImageFiles = ref([]) // [{ file, preview }]
+const loadingImages = ref(false)
+const generatingDesc = ref(false)
+const generatingBizDesc = ref(false)
+
+const generateBusinessDescription = async () => {
+  if (!formData.value.name?.trim() || generatingBizDesc.value) return
+  generatingBizDesc.value = true
+  try {
+    const categoriaObj = categories.value.find(c => selectedCategorias.value.includes(c.id_categoria))
+    const loc = formData.value.locationData
+    const ubicacion = [loc?.municipio, loc?.departamento].filter(Boolean).join(', ')
+    const res = await api.post('/ai/generate-description', {
+      nombre: formData.value.name,
+      tipo: 'negocio',
+      nombre_negocio: formData.value.name,
+      categoria: categoriaObj?.nombre || '',
+      ubicacion,
+      horario: formData.value.horario || ''
+    })
+    if (res.data?.descripcion) formData.value.description = res.data.descripcion
+  } catch { /* silent */ } finally {
+    generatingBizDesc.value = false
   }
 }
 
-const clearProductImage = () => {
-  productImageFile.value = null
-  productImagePreview.value = null
+const generateDescription = async () => {
+  if (!productForm.value.nombre?.trim() || generatingDesc.value) return
+  generatingDesc.value = true
+  try {
+    const res = await api.post('/ai/generate-description', {
+      nombre: productForm.value.nombre,
+      tipo: productForm.value.tipo,
+      nombre_negocio: props.business?.name,
+      categoria: props.business?.category
+    })
+    if (res.data?.descripcion) productForm.value.descripcion = res.data.descripcion
+  } catch {
+    // silently fail — user can write manually
+  } finally {
+    generatingDesc.value = false
+  }
+}
+
+const fetchProductImages = async (productId) => {
+  loadingImages.value = true
+  try {
+    const res = await api.get(`/imagenes/producto/${productId}`)
+    existingProductImages.value = res.data?.data || []
+  } catch {
+    existingProductImages.value = []
+  } finally {
+    loadingImages.value = false
+  }
+}
+
+const handleProductImageChange = (e) => {
+  const files = Array.from(e.target.files)
+  for (const file of files) {
+    newImageFiles.value.push({ file, preview: URL.createObjectURL(file) })
+  }
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+const removeNewImage = (idx) => { newImageFiles.value.splice(idx, 1) }
+
+const deleteExistingImage = async (image) => {
+  try {
+    await api.delete(`/imagenes/producto/${image.id_imagen_producto}`)
+    existingProductImages.value = existingProductImages.value.filter(i => i.id_imagen_producto !== image.id_imagen_producto)
+    showToast('Imagen eliminada', 'success')
+  } catch {
+    showToast('No se pudo eliminar la imagen', 'error')
+  }
 }
 
 const fileInputRef = ref(null)
-const triggerFileInput = () => {
-  if (fileInputRef.value) {
-    fileInputRef.value.click()
-  }
-}
+const triggerFileInput = () => { if (fileInputRef.value) fileInputRef.value.click() }
 
 const handleKeydown = (e) => {
   if (e.key === 'Escape' && props.show) {
@@ -108,8 +173,8 @@ watch(() => props.show, async (newVal) => {
     showProductForm.value = false
     editingProduct.value = null
     deletingId.value = null
-    productImageFile.value = null
-    productImagePreview.value = null
+    existingProductImages.value = []
+    newImageFiles.value = []
 
     // Strip https://wa.me/ prefix — backend stores/validates the raw number
     const rawWhatsapp = (props.business.socials?.whatsapp || '').replace('https://wa.me/', '')
@@ -156,6 +221,15 @@ const fetchProducts = async () => {
   try {
     const res = await api.get(`/productos/emprendimiento/${props.business.id}`)
     products.value = res.data?.data || []
+    // Precargar imágenes de cada producto en paralelo (no bloqueante)
+    Promise.all(products.value.map(async (p) => {
+      try {
+        const imgRes = await api.get(`/imagenes/producto/${p.id_producto}`)
+        productImagesCache.value[p.id_producto] = imgRes.data?.data || []
+      } catch {
+        productImagesCache.value[p.id_producto] = []
+      }
+    }))
   } catch (error) {
     console.error('Error fetching products:', error)
   } finally {
@@ -205,6 +279,8 @@ const saveGeneral = async () => {
     payload.categorias = selectedCategorias.value
     if (formData.value.horario)          payload.horario     = formData.value.horario
     if (formData.value.socials?.whatsapp) payload.whatsapp   = formData.value.socials.whatsapp
+    payload.facebook  = formData.value.socials?.facebook  || ''
+    payload.instagram = formData.value.socials?.instagram || ''
     if (loc.departamento) payload.departamento = loc.departamento
     if (loc.municipio)    payload.municipio    = loc.municipio
     if (loc.localidad)    payload.localidad    = loc.localidad
@@ -219,7 +295,12 @@ const saveGeneral = async () => {
       name:         payload.nombre        ?? props.business.name,
       description:  payload.descripcion   ?? props.business.description,
       horario:      payload.horario       ?? props.business.horario,
-      socials: { ...props.business.socials, whatsapp: payload.whatsapp ?? props.business.socials?.whatsapp },
+      socials: {
+        ...props.business.socials,
+        whatsapp:  payload.whatsapp  ?? props.business.socials?.whatsapp,
+        facebook:  payload.facebook  ?? props.business.socials?.facebook,
+        instagram: payload.instagram ?? props.business.socials?.instagram
+      },
       lat:          payload.latitud       ?? props.business.lat,
       lng:          payload.longitud      ?? props.business.lng,
       departamento: payload.departamento  ?? props.business.departamento,
@@ -246,22 +327,25 @@ const saveGeneral = async () => {
 // Product Actions
 const openNewProduct = () => {
   editingProduct.value = null
-  productForm.value = { tipo: 'producto', nombre: '', descripcion: '' }
-  productImageFile.value = null
-  productImagePreview.value = null
+  productForm.value = { tipo: 'producto', nombre: '', descripcion: '', precio: '', visibilidad_precio: 'VISIBLE' }
+  existingProductImages.value = []
+  newImageFiles.value = []
   showProductForm.value = true
 }
 
 const openEditProduct = (prod) => {
   editingProduct.value = prod
-  productForm.value = { 
-    tipo: prod.tipo?.toLowerCase() || 'producto', 
-    nombre: prod.nombre, 
-    descripcion: prod.descripcion 
+  productForm.value = {
+    tipo: prod.tipo?.toLowerCase() || 'producto',
+    nombre: prod.nombre,
+    descripcion: prod.descripcion,
+    precio: prod.precio ?? '',
+    visibilidad_precio: prod.visibilidad_precio || 'VISIBLE'
   }
-  productImageFile.value = null
-  productImagePreview.value = prod.imagen || null
+  newImageFiles.value = []
+  existingProductImages.value = []
   showProductForm.value = true
+  fetchProductImages(prod.id_producto)
 }
 
 const saveProduct = async () => {
@@ -278,28 +362,33 @@ const saveProduct = async () => {
   try {
     let savedProductId = null
 
+    const cleanForm = {
+      ...productForm.value,
+      precio: productForm.value.precio !== '' && productForm.value.precio !== null
+        ? Number(productForm.value.precio)
+        : null
+    }
+
     if (editingProduct.value) {
-      await api.put(`/productos/${editingProduct.value.id_producto}`, productForm.value)
+      await api.put(`/productos/${editingProduct.value.id_producto}`, cleanForm)
       savedProductId = editingProduct.value.id_producto
     } else {
-      const payload = { ...productForm.value, id_emprendimiento: props.business.id }
+      const payload = { ...cleanForm, id_emprendimiento: props.business.id }
       const res = await api.post(`/productos`, payload)
       savedProductId = res.data?.data?.id_producto || res.data?.id_producto || res.data?.id
     }
 
     let imageFailed = false
-    if (productImageFile.value && savedProductId) {
-      try {
-        const formData = new FormData()
-        formData.append('imagen', productImageFile.value)
-
-        await api.post(`/imagenes/producto/${savedProductId}`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
-      } catch (imgError) {
-        console.error('Error al subir imagen:', imgError)
-        imageFailed = true
+    if (newImageFiles.value.length && savedProductId) {
+      for (const { file } of newImageFiles.value) {
+        try {
+          await uploadProductImage(file, savedProductId)
+        } catch (imgError) {
+          console.error('Error al subir imagen:', imgError)
+          imageFailed = true
+        }
       }
+      newImageFiles.value = []
     }
 
     if (imageFailed) {
@@ -375,7 +464,16 @@ const executeDelete = async (id) => {
             </div>
             
             <div class="md:col-span-2">
-              <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Descripción</label>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-xs font-black text-slate-400 uppercase tracking-widest">Descripción</label>
+                <button type="button" @click="generateBusinessDescription"
+                  :disabled="!formData.name?.trim() || generatingBizDesc"
+                  class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
+                  <svg v-if="generatingBizDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  <span v-else>✦</span>
+                  {{ generatingBizDesc ? 'Generando...' : 'Generar con IA' }}
+                </button>
+              </div>
               <textarea v-model="formData.description" rows="3" class="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-slate-600 focus:outline-none focus:border-fiery-red transition-all"></textarea>
             </div>
 
@@ -384,28 +482,33 @@ const executeDelete = async (id) => {
               <LocationPicker v-model="formData.locationData" />
             </div>
 
-            <div class="md:col-span-2">
+            <div class="md:col-span-2 relative">
               <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">
-                Categorías <span class="text-slate-300 font-normal normal-case">(mín. 1, máx. 3)</span>
+                Categorías <span class="text-slate-300 font-normal normal-case">(máx. 3)</span>
               </label>
-              <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <button
-                  v-for="cat in categories"
-                  :key="cat.id_categoria"
-                  type="button"
+              <button type="button" @click="categoryDropdownOpen = !categoryDropdownOpen"
+                class="w-full min-h-[44px] border border-slate-200 bg-white rounded-xl px-4 py-2 flex items-center flex-wrap gap-2 text-left focus:outline-none focus:border-fiery-red transition-all">
+                <span v-if="selectedCategorias.length === 0" class="text-slate-400 text-sm font-medium">Selecciona categorías...</span>
+                <span v-for="id in selectedCategorias" :key="id"
+                  class="inline-flex items-center gap-1 bg-fiery-navy text-white text-[10px] font-black uppercase px-2.5 py-1 rounded-lg">
+                  {{ categories.find(c => c.id_categoria === id)?.nombre }}
+                  <button type="button" @click.stop="selectedCategorias.splice(selectedCategorias.indexOf(id), 1)"
+                    class="hover:text-white/60 transition-colors leading-none">×</button>
+                </span>
+                <svg class="w-4 h-4 text-slate-400 ml-auto shrink-0 transition-transform" :class="categoryDropdownOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </button>
+              <div v-if="categoryDropdownOpen" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+                <button v-for="cat in categories" :key="cat.id_categoria" type="button"
                   :disabled="!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3"
                   @click="selectedCategorias.includes(cat.id_categoria)
                     ? selectedCategorias.splice(selectedCategorias.indexOf(cat.id_categoria), 1)
-                    : selectedCategorias.push(cat.id_categoria)"
-                  :class="[
-                    'px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all border text-left',
-                    selectedCategorias.includes(cat.id_categoria)
-                      ? 'bg-fiery-navy text-white border-fiery-navy'
-                      : 'bg-white text-slate-500 border-slate-200 hover:border-fiery-red hover:text-fiery-red',
-                    (!selectedCategorias.includes(cat.id_categoria) && selectedCategorias.length >= 3)
-                      ? 'opacity-40 cursor-not-allowed' : ''
-                  ]"
-                >{{ cat.nombre }}</button>
+                    : (selectedCategorias.length < 3 && selectedCategorias.push(cat.id_categoria))"
+                  class="w-full text-left px-4 py-3 text-sm flex items-center gap-3 hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed border-b border-slate-50 last:border-0">
+                  <span :class="['w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors', selectedCategorias.includes(cat.id_categoria) ? 'bg-fiery-navy border-fiery-navy' : 'border-slate-300']">
+                    <svg v-if="selectedCategorias.includes(cat.id_categoria)" class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
+                  </span>
+                  <span class="font-bold text-fiery-navy">{{ cat.nombre }}</span>
+                </button>
               </div>
               <p v-if="selectedCategorias.length === 0" class="text-[10px] text-red-400 font-bold mt-1">Selecciona al menos una categoría</p>
             </div>
@@ -496,27 +599,75 @@ const executeDelete = async (id) => {
                 </label>
               </div>
               <input v-model="productForm.nombre" placeholder="Nombre" type="text" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-fiery-navy font-bold text-slate-800" />
-              <textarea v-model="productForm.descripcion" placeholder="Descripción" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-fiery-navy text-slate-600"></textarea>
-              
-              <!-- Image Upload Area -->
-              <div class="mt-2">
-                <input type="file" ref="fileInputRef" accept="image/*" class="hidden" @change="handleProductImageChange" />
-                
-                <div v-if="productImagePreview" class="relative w-full h-[120px] rounded-xl overflow-hidden border border-slate-200 shadow-inner group">
-                  <img :src="productImagePreview" class="w-full h-full object-cover" />
-                  <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[2px]">
-                    <button @click="triggerFileInput" class="bg-white/20 hover:bg-white/40 text-white px-4 py-2 rounded-lg text-xs font-bold transition-colors shadow-sm">Cambiar imagen</button>
+              <div class="relative">
+                <textarea v-model="productForm.descripcion" placeholder="Descripción" rows="2" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-4 py-2 pr-28 text-sm focus:outline-none focus:border-fiery-navy text-slate-600"></textarea>
+                <button
+                  type="button"
+                  @click="generateDescription"
+                  :disabled="!productForm.nombre?.trim() || generatingDesc"
+                  class="absolute right-2 top-2 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  :class="generatingDesc ? 'bg-slate-100 text-slate-400' : 'bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white'"
+                  title="Generar descripción con IA"
+                >
+                  <svg v-if="generatingDesc" class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  <span v-else>✦</span>
+                  {{ generatingDesc ? 'Generando...' : 'Generar con IA' }}
+                </button>
+              </div>
+              <div class="flex gap-2">
+                <div class="relative flex-1">
+                  <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
+                  <input v-model="productForm.precio" placeholder="0.00" type="number" min="0" step="0.01"
+                    class="w-full border border-slate-200 bg-slate-50 rounded-xl pl-7 pr-4 py-2 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
+                </div>
+                <select v-model="productForm.visibilidad_precio"
+                  class="border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy">
+                  <option value="VISIBLE">Mostrar</option>
+                  <option value="APROXIMADO">~Aprox</option>
+                  <option value="OCULTO">Consultar</option>
+                </select>
+              </div>
+
+              <!-- Imágenes (solo para productos) -->
+              <template v-if="productForm.tipo === 'producto'">
+                <div v-if="editingProduct">
+                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Imágenes actuales</p>
+                  <div v-if="loadingImages" class="flex justify-center py-3">
+                    <div class="w-5 h-5 border-2 border-fiery-navy border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                  <button @click.stop="clearProductImage" class="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-md transition-colors" title="Quitar imagen">
-                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
-                  </button>
+                  <div v-else-if="existingProductImages.length > 0" class="grid grid-cols-4 gap-2 mb-2">
+                    <div v-for="img in existingProductImages" :key="img.id_imagen_producto" class="relative group h-16">
+                      <img :src="img.url" class="w-full h-full object-cover rounded-lg" />
+                      <button @click="deleteExistingImage(img)"
+                        class="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow">×</button>
+                    </div>
+                  </div>
+                  <p v-else class="text-xs text-slate-400 mb-2">Sin imágenes aún</p>
                 </div>
 
-                <div v-else @click="triggerFileInput" class="w-full h-[120px] rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-100 transition-colors group">
-                  <svg class="w-8 h-8 text-slate-300 group-hover:text-fiery-navy mb-2 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                  <span class="text-xs font-bold text-slate-400 group-hover:text-fiery-navy transition-colors">Agregar imagen opcional</span>
+                <div>
+                  <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                    {{ editingProduct ? 'Agregar imágenes' : 'Imágenes' }}
+                  </p>
+                  <input type="file" ref="fileInputRef" accept="image/*" multiple class="hidden" @change="handleProductImageChange" />
+                  <div v-if="newImageFiles.length > 0" class="grid grid-cols-3 gap-2 mb-1">
+                    <div v-for="(item, idx) in newImageFiles" :key="idx" class="relative group h-20">
+                      <img :src="item.preview" class="w-full h-full object-cover rounded-xl" />
+                      <button @click.stop="removeNewImage(idx)"
+                        class="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow">×</button>
+                    </div>
+                    <div @click="triggerFileInput"
+                      class="h-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-fiery-navy transition-colors">
+                      <span class="text-2xl text-slate-300 leading-none">+</span>
+                    </div>
+                  </div>
+                  <div v-else @click="triggerFileInput" class="w-full h-[100px] rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 flex flex-col items-center justify-center cursor-pointer hover:border-fiery-navy hover:bg-slate-100 transition-colors group">
+                    <svg class="w-7 h-7 text-slate-300 group-hover:text-fiery-navy mb-1 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <span class="text-xs font-bold text-slate-400 group-hover:text-fiery-navy transition-colors">Seleccionar imágenes</span>
+                    <span class="text-[10px] text-slate-300 mt-0.5">Puedes elegir varias</span>
+                  </div>
                 </div>
-              </div>
+              </template>
 
               <div class="flex gap-3 justify-end pt-2">
                 <button @click="showProductForm = false" class="px-5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
@@ -540,8 +691,8 @@ const executeDelete = async (id) => {
           <div v-if="products.length > 0 && !loadingProducts" class="space-y-3">
             <div v-for="prod in products" :key="prod.id_producto" class="bg-white border border-slate-200 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4 items-start sm:items-center hover:border-slate-300 transition-colors relative">
               
-              <div class="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center text-slate-300 border border-slate-200 shadow-inner hidden sm:flex">
-                <img v-if="prod.imagen_url" :src="prod.imagen_url" class="w-full h-full object-cover" />
+              <div v-if="prod.tipo?.toLowerCase() === 'producto'" class="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center text-slate-300 border border-slate-200 shadow-inner hidden sm:flex">
+                <img v-if="getProductThumbnail(prod)" :src="getProductThumbnail(prod)" class="w-full h-full object-cover" />
                 <svg v-else class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
               </div>
 

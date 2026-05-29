@@ -11,7 +11,7 @@ class Categoria {
     const params = [
       { name: 'id_categoria_padre', value: categoriaData.id_categoria_padre || null, type: sql.Int },
       { name: 'nombre', value: categoriaData.nombre, type: sql.VarChar },
-      { name: 'descripcion', value: categoriaData.descripcion, type: sql.VarChar },
+      { name: 'descripcion', value: categoriaData.descripcion || null, type: sql.VarChar },
       { name: 'activo', value: categoriaData.activo !== undefined ? categoriaData.activo : 1, type: sql.Bit }
     ];
 
