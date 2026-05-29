@@ -3,14 +3,15 @@ const {executeQuery, sql} = require('../config/database');
 class Calificacion {
     static async create(calificacionData) {
         const query = `
-            INSERT INTO CALIFICACIONES (id_usuario, id_emprendimiento, puntuacion)
-            VALUES (@id_usuario, @id_emprendimiento, @puntuacion);
+            INSERT INTO CALIFICACIONES (id_usuario, id_emprendimiento, puntuacion, comentario, fecha_calificacion)
+            VALUES (@id_usuario, @id_emprendimiento, @puntuacion, @comentario, GETDATE());
             SELECT SCOPE_IDENTITY() as id_calificacion;
         `;
         const params = [
             { name: 'id_usuario',        value: calificacionData.id_usuario,        type: sql.Int },
             { name: 'id_emprendimiento', value: calificacionData.id_emprendimiento, type: sql.Int },
             { name: 'puntuacion',        value: calificacionData.puntuacion,        type: sql.Int },
+            { name: 'comentario',        value: calificacionData.comentario || null, type: sql.NVarChar },
         ];
 
         const result = await executeQuery(query, params);
@@ -24,7 +25,7 @@ class Calificacion {
             FROM CALIFICACIONES c
             LEFT JOIN Usuarios u ON c.id_usuario = u.id_usuario
             WHERE c.id_emprendimiento = @id_emprendimiento
-            ORDER BY c.id_calificacion DESC
+            ORDER BY c.fecha_calificacion DESC
         `;
 
         const params = [{ name: 'id_emprendimiento', value: id_emprendimiento, type: sql.Int }];

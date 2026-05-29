@@ -246,6 +246,19 @@ export const getBusinessReviews = async (businessId) => {
   }
 };
 
+export const getProductImages = async (productId) => {
+  try {
+    const response = await api.get(`/imagenes/producto/${productId}`);
+    if (response.data.success && response.data.data) {
+      return response.data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error(`Error fetching images for product ${productId}:`, error);
+    return [];
+  }
+};
+
 // Comprime una imagen en el cliente antes de subirla.
 // Convierte a JPEG para garantizar compresión. maxWidth en px, quality 0-1.
 const compressImage = (file, maxWidth, quality) => new Promise((resolve) => {

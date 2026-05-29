@@ -198,7 +198,8 @@ class Emprendimiento {
     const ALLOWED = new Set([
       'id_categoria', 'nombre', 'descripcion', 'telefono', 'whatsapp',
       'latitud', 'longitud', 'horario', 'vistas', 'destacado', 'estado',
-      'departamento', 'municipio', 'localidad', 'direccion', 'logo_url'
+      'departamento', 'municipio', 'localidad', 'direccion', 'logo_url',
+      'instagram', 'facebook', 'website'
     ]);
     const TYPE_MAP = {
       id_categoria: sql.Int,

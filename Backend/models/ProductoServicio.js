@@ -194,10 +194,18 @@ class ProductoServicio {
     const setClause = [];
     const params = [{ name: 'id_producto', value: id, type: sql.Int }];
 
+    const typeFor = (key) => {
+      if (key === 'precio') return sql.Decimal;
+      if (key === 'disponible') return sql.Bit;
+      if (key === 'id_emprendimiento') return sql.Int;
+      return sql.NVarChar;
+    };
+
     Object.keys(productoData).forEach((key, index) => {
-      if (productoData[key] !== undefined) {
+      const val = productoData[key];
+      if (val !== undefined) {
         setClause.push(`${key} = @param${index}`);
-        params.push({ name: `param${index}`, value: productoData[key], type: sql.NVarChar });
+        params.push({ name: `param${index}`, value: val === '' ? null : val, type: typeFor(key) });
       }
     });
 

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import { useAuthStore } from '../stores/auth'
-import { getRawCategories } from '../services/businessService'
+import { getRawCategories, uploadProductImage } from '../services/businessService'
 import api from '../services/api'
 
 const router = useRouter()
@@ -94,38 +94,36 @@ const toggleDay = (day) => {
 const products = ref([])
 const showProductForm = ref(false)
 const editingProduct = ref(null)
-const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '' })
-const productImageFile = ref(null)
-const productImagePreview = ref(null)
+const productForm = ref({ tipo: 'producto', nombre: '', descripcion: '', precio: '', visibilidad_precio: 'VISIBLE' })
+const productImageFiles = ref([]) // [{ file, preview }]
 const fileInputRef = ref(null)
 const deletingId = ref(null)
 
 const handleProductImageChange = (e) => {
-  const file = e.target.files[0]
-  if (file) {
-    productImageFile.value = file
-    productImagePreview.value = URL.createObjectURL(file)
+  const files = Array.from(e.target.files)
+  for (const file of files) {
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Cada imagen no debe superar 5MB', 'error')
+      continue
+    }
+    productImageFiles.value.push({ file, preview: URL.createObjectURL(file) })
   }
+  if (fileInputRef.value) fileInputRef.value.value = ''
 }
-const clearProductImage = () => {
-  productImageFile.value = null
-  productImagePreview.value = null
-}
+const removeProductImage = (idx) => { productImageFiles.value.splice(idx, 1) }
 const triggerFileInput = () => fileInputRef.value?.click()
 
 const openNewProduct = () => {
   editingProduct.value = null
-  productForm.value = { tipo: 'producto', nombre: '', descripcion: '' }
-  productImageFile.value = null
-  productImagePreview.value = null
+  productForm.value = { tipo: 'producto', nombre: '', descripcion: '', precio: '', visibilidad_precio: 'VISIBLE' }
+  productImageFiles.value = []
   showProductForm.value = true
 }
 
 const openEditProduct = (prod) => {
   editingProduct.value = prod
-  productForm.value = { tipo: prod.tipo || 'producto', nombre: prod.nombre, descripcion: prod.descripcion || '', precio: prod.precio ?? '' }
-  productImageFile.value = null
-  productImagePreview.value = prod.imagen || null
+  productForm.value = { tipo: prod.tipo || 'producto', nombre: prod.nombre, descripcion: prod.descripcion || '', precio: prod.precio ?? '', visibilidad_precio: prod.visibilidad_precio || 'VISIBLE' }
+  productImageFiles.value = (prod.imageFiles || []).map(i => ({ ...i }))
   showProductForm.value = true
 }
 
@@ -134,14 +132,15 @@ const saveProductLocal = () => {
     showToast('El nombre del producto es requerido', 'error')
     return
   }
+  const snapshot = productImageFiles.value.slice()
   if (editingProduct.value !== null) {
     const idx = products.value.findIndex(p => p._localId === editingProduct.value._localId)
     if (idx !== -1) {
       products.value[idx] = {
         ...products.value[idx],
         ...productForm.value,
-        imagen: productImagePreview.value,
-        imageFile: productImageFile.value
+        imageFiles: snapshot,
+        imagen: snapshot[0]?.preview || null
       }
     }
   } else {
@@ -149,10 +148,11 @@ const saveProductLocal = () => {
       _localId: Date.now(),
       ...productForm.value,
       precio: productForm.value.precio ? Number(productForm.value.precio) : null,
-      imagen: productImagePreview.value,
-      imageFile: productImageFile.value
+      imageFiles: snapshot,
+      imagen: snapshot[0]?.preview || null
     })
   }
+  productImageFiles.value = []
   showProductForm.value = false
   editingProduct.value = null
 }
@@ -250,20 +250,23 @@ const submitRequest = async () => {
         try {
           const prodPayload = {
             id_emprendimiento: newId,
-            nombre:      prod.nombre,
-            descripcion: prod.descripcion || '',
-            tipo:        prod.tipo,
+            nombre:            prod.nombre,
+            descripcion:       prod.descripcion || '',
+            tipo:              prod.tipo,
+            visibilidad_precio: prod.visibilidad_precio || 'VISIBLE',
             ...(prod.precio ? { precio: Number(prod.precio) } : {})
           }
           const prodRes = await api.post('/productos', prodPayload)
           const prodId = prodRes.data?.data?.id_producto || prodRes.data?.id_producto
 
-          if (prod.imageFile && prodId) {
-            const fd = new FormData()
-            fd.append('imagen', prod.imageFile)
-            await api.post(`/imagenes/producto/${prodId}`, fd, {
-              headers: { 'Content-Type': 'multipart/form-data' }
-            })
+          if (prodId && prod.imageFiles?.length) {
+            for (const { file } of prod.imageFiles) {
+              try {
+                await uploadProductImage(file, prodId)
+              } catch (imgErr) {
+                console.warn('Error al subir imagen de producto:', imgErr)
+              }
+            }
           }
         } catch (prodErr) {
           console.warn('Error al crear producto:', prodErr)
@@ -531,19 +534,33 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:outline-none focus:border-fiery-navy" />
             <textarea v-model="productForm.descripcion" placeholder="Descripción (opcional)" rows="2"
               class="w-full border border-slate-200 bg-white rounded-xl px-4 py-2.5 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy resize-none"></textarea>
-            <div class="relative">
-              <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
-              <input v-model="productForm.precio" placeholder="Precio (opcional)" type="number" min="0" step="0.01"
-                class="w-full border border-slate-200 bg-white rounded-xl pl-7 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
+
+            <!-- Precio y visibilidad -->
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">Q</span>
+                <input v-model="productForm.precio" placeholder="0.00" type="number" min="0" step="0.01"
+                  class="w-full border border-slate-200 bg-white rounded-xl pl-7 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-fiery-navy" />
+              </div>
+              <select v-model="productForm.visibilidad_precio"
+                class="border border-slate-200 bg-white rounded-xl px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:border-fiery-navy">
+                <option value="VISIBLE">Mostrar precio</option>
+                <option value="APROXIMADO">Aproximado (~)</option>
+                <option value="OCULTO">Consultar</option>
+              </select>
             </div>
 
-            <!-- Imagen -->
-            <input type="file" ref="fileInputRef" accept="image/*" class="hidden" @change="handleProductImageChange" />
-            <div v-if="productImagePreview" class="relative w-full h-[110px] rounded-xl overflow-hidden border border-slate-200 group">
-              <img :src="productImagePreview" class="w-full h-full object-cover" />
-              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                <button @click="triggerFileInput" class="bg-white/20 hover:bg-white/40 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Cambiar</button>
-                <button @click="clearProductImage" class="bg-red-500/80 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold">Quitar</button>
+            <!-- Múltiples imágenes -->
+            <input type="file" ref="fileInputRef" accept="image/*" multiple class="hidden" @change="handleProductImageChange" />
+            <div v-if="productImageFiles.length > 0" class="grid grid-cols-3 gap-2">
+              <div v-for="(item, idx) in productImageFiles" :key="idx" class="relative group h-20">
+                <img :src="item.preview" class="w-full h-full object-cover rounded-xl" />
+                <button @click.stop="removeProductImage(idx)"
+                  class="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity shadow">×</button>
+              </div>
+              <div @click="triggerFileInput"
+                class="h-20 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-fiery-navy transition-colors">
+                <span class="text-2xl text-slate-300 leading-none">+</span>
               </div>
             </div>
             <div v-else @click="triggerFileInput"
@@ -551,7 +568,8 @@ onUnmounted(() => window.removeEventListener('keydown', onKeydown))
               <svg class="w-7 h-7 text-slate-300 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
               </svg>
-              <span class="text-xs font-bold text-slate-400">Agregar imagen (opcional)</span>
+              <span class="text-xs font-bold text-slate-400">Agregar imágenes (opcional)</span>
+              <span class="text-[10px] text-slate-300 mt-0.5">Puedes seleccionar varias</span>
             </div>
 
             <div class="flex gap-3 justify-end pt-1">
