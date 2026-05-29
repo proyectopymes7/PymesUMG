@@ -2,7 +2,7 @@ const { body, validationResult } = require('express-validator');
 const Emprendimiento = require('../models/Emprendimiento');
 const User = require('../models/User');
 const logger = require('../utils/logger');
-const { sendBusinessApproved, sendBusinessRejected } = require('../utils/EmailService');
+const { sendBusinessApproved, sendBusinessRejected, sendNewBusinessRequest } = require('../utils/EmailService');
 
 const isAdmin = (user) => user && (user.id_rol === 1 || user.id_rol === 2);
 const isOwner = (user, emp) => user && user.id_usuario === emp.id_usuario;
@@ -29,6 +29,18 @@ const createEmprendimiento = async (req, res) => {
       userId: req.user.id_usuario,
       emprendimientoId: newEmprendimiento.id_emprendimiento
     });
+
+    // Notificar al admin sobre la nueva solicitud
+    try {
+      await sendNewBusinessRequest(
+        fullEmprendimiento.nombre,
+        req.user.nombre,
+        req.user.correo
+      );
+      logger.info(`New business request email sent for: ${fullEmprendimiento.nombre}`);
+    } catch (emailErr) {
+      logger.warn(`Failed to send new request email: ${emailErr.message}`);
+    }
 
     res.status(201).json({
       success: true,
@@ -91,9 +103,7 @@ const getEmprendimientoById = async (req, res) => {
       });
     }
 
-    const estadoNorm = emprendimiento.estado?.toLowerCase();
-    const isPublic = estadoNorm === 'activo' || estadoNorm === 'aprobado';
-    if (!isPublic && !isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
+    if (emprendimiento.estado !== 'APROBADO' && !isAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
       return res.status(403).json({
         error: 'Access denied',
         message: 'You do not have permission to view this emprendimiento'
