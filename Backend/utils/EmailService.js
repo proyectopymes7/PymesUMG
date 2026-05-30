@@ -42,7 +42,6 @@ const wrapWithBg = (innerContent) => `
               box-shadow:0 4px 24px rgba(0,0,0,0.12);
               vertical-align:top;
             ">
-              <!-- Logo / marca -->
               <div style="text-align:center;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid #f0f4f8;">
                 <span style="font-size:20px;font-weight:900;letter-spacing:-0.5px;color:#003049;">AQUÍ<span style="color:#C1121F;">TENES</span></span>
               </div>
@@ -58,11 +57,12 @@ const wrapWithBg = (innerContent) => `
 </html>
 `
 
-// ── Ícono SVG inline ────────────────────────────────────
 const iconCheck = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#22c55e"/><path d="M7 12.5l3.5 3.5 6.5-7" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
 const iconX = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#ef4444"/><path d="M8 8l8 8M16 8l-8 8" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`
 const iconLock = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#C1121F"/><rect x="8" y="11" width="8" height="6" rx="1.5" fill="#fff"/><path d="M9.5 11V9a2.5 2.5 0 015 0v2" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>`
 const iconBell = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#f59e0b"/><path d="M12 7a3 3 0 00-3 3v2l-1 1.5h8L15 12v-2a3 3 0 00-3-3z" fill="#fff"/><circle cx="12" cy="17" r="1" fill="#fff"/></svg>`
+const iconPause = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#64748b"/><rect x="8" y="7" width="3" height="10" rx="1" fill="#fff"/><rect x="13" y="7" width="3" height="10" rx="1" fill="#fff"/></svg>`
+const iconPlay = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="vertical-align:middle;margin-right:6px;" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="12" fill="#003049"/><path d="M10 8l6 4-6 4V8z" fill="#fff"/></svg>`
 
 const btnStyle = (bg) => `display:inline-block;background:${bg};color:#fff;text-decoration:none;padding:11px 26px;border-radius:999px;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:1.5px;`
 
@@ -177,11 +177,13 @@ const sendNewBusinessRequest = async (nombreNegocio, nombreUsuario, correoUsuari
   })
 }
 
+// ── Correo: nueva reseña al vendedor ───────────────────
 const sendNewReview = async (correoEmprendedor, nombreEmprendedor, nombreNegocio, puntuacion, comentario) => {
   const estrellas = '★'.repeat(puntuacion) + '☆'.repeat(5 - puntuacion)
   const inner = `
-    <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#003049;">⭐ Nueva reseña en tu negocio</p>
+    <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#003049;">Nueva reseña en tu negocio</p>
     <p style="color:#64748b;font-size:11px;margin:0 0 14px;padding-bottom:14px;border-bottom:1px solid #f0f4f8;">Alguien dejó una reseña en <strong>${nombreNegocio}</strong>.</p>
+    <p style="color:#1e293b;font-size:13px;font-weight:700;margin:0 0 6px;">Hola, ${nombreEmprendedor}</p>
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
       <tr>
         <td style="padding:6px 0;border-bottom:1px solid #f0f4f8;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;width:38%;">Calificación</td>
@@ -193,7 +195,7 @@ const sendNewReview = async (correoEmprendedor, nombreEmprendedor, nombreNegocio
       </tr>` : ''}
     </table>
     <div style="text-align:center;margin-bottom:4px;">
-      <a href="${process.env.FRONTEND_URL}" style="${btnStyle('#C1121F')}">Ver mi negocio</a>
+      <a href="${process.env.FRONTEND_URL}/mi-negocio" style="${btnStyle('#C1121F')}">Ver mi negocio</a>
     </div>
     ${footer}
   `
@@ -205,4 +207,56 @@ const sendNewReview = async (correoEmprendedor, nombreEmprendedor, nombreNegocio
   })
 }
 
-module.exports = { sendBusinessApproved, sendBusinessRejected, sendPasswordReset, sendNewBusinessRequest, sendNewReview }
+// ── Correo: negocio desactivado ─────────────────────────
+const sendBusinessDeactivated = async (correo, nombreUsuario, nombreNegocio) => {
+  const inner = `
+    <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#003049;">${iconPause} Negocio Desactivado</p>
+    <p style="color:#64748b;font-size:11px;margin:0 0 14px;padding-bottom:14px;border-bottom:1px solid #f0f4f8;">Tu negocio ha sido desactivado temporalmente.</p>
+    <p style="color:#1e293b;font-size:13px;font-weight:700;margin:0 0 6px;">Hola, ${nombreUsuario}</p>
+    <p style="color:#64748b;font-size:11px;line-height:1.7;margin:0 0 16px;">
+      Tu negocio <strong style="color:#003049;">${nombreNegocio}</strong> ha sido desactivado por un administrador y ya no es visible en el directorio. Si tienes alguna duda, contáctanos.
+    </p>
+    <div style="text-align:center;margin-bottom:4px;">
+      <a href="${process.env.FRONTEND_URL}" style="${btnStyle('#64748b')}">Ir a AquíTenes</a>
+    </div>
+    ${footer}
+  `
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: correo,
+    subject: `Tu negocio "${nombreNegocio}" fue desactivado en AquíTenes`,
+    html: wrapWithBg(inner)
+  })
+}
+
+// ── Correo: negocio reactivado ──────────────────────────
+const sendBusinessActivated = async (correo, nombreUsuario, nombreNegocio) => {
+  const inner = `
+    <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#003049;">${iconPlay} Negocio Reactivado</p>
+    <p style="color:#64748b;font-size:11px;margin:0 0 14px;padding-bottom:14px;border-bottom:1px solid #f0f4f8;">Tu negocio vuelve a estar visible en el directorio.</p>
+    <p style="color:#1e293b;font-size:13px;font-weight:700;margin:0 0 6px;">Hola, ${nombreUsuario}</p>
+    <p style="color:#64748b;font-size:11px;line-height:1.7;margin:0 0 16px;">
+      Tu negocio <strong style="color:#003049;">${nombreNegocio}</strong> ha sido reactivado por un administrador y ya es visible nuevamente en el directorio AquíTenes.
+    </p>
+    <div style="text-align:center;margin-bottom:4px;">
+      <a href="${process.env.FRONTEND_URL}/mi-negocio" style="${btnStyle('#003049')}">Ver mi negocio</a>
+    </div>
+    ${footer}
+  `
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM,
+    to: correo,
+    subject: `Tu negocio "${nombreNegocio}" fue reactivado en AquíTenes`,
+    html: wrapWithBg(inner)
+  })
+}
+
+module.exports = {
+  sendBusinessApproved,
+  sendBusinessRejected,
+  sendPasswordReset,
+  sendNewBusinessRequest,
+  sendNewReview,
+  sendBusinessDeactivated,
+  sendBusinessActivated
+}

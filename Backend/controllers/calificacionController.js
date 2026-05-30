@@ -43,14 +43,24 @@ const createCalificacion = async (req, res) => {
 
         // Notificar al dueño del negocio por email
         try {
+            logger.info(`[DEBUG-EMAIL] Iniciando envío de correo de reseña para emprendimiento: ${id_emprendimiento}`);
             const emp = await Emprendimiento.findById(id_emprendimiento);
+            logger.info(`[DEBUG-EMAIL] Emprendimiento encontrado: ${emp ? emp.nombre : 'NO ENCONTRADO'}, ID Usuario Dueño: ${emp ? emp.id_usuario : 'N/A'}`);
+            
             if (emp) {
                 const owner = await User.findById(emp.id_usuario);
+                logger.info(`[DEBUG-EMAIL] Dueño encontrado: ${owner ? owner.nombre : 'NO ENCONTRADO'}, Correo: ${owner ? owner.correo : 'N/A'}`);
+                
                 if (owner && owner.correo) {
+                    logger.info(`[DEBUG-EMAIL] Llamando a sendNewReview con: correo=${owner.correo}, nombre=${owner.nombre}, negocio=${emp.nombre}, puntuacion=${puntuacion}`);
                     await sendNewReview(owner.correo, owner.nombre, emp.nombre, puntuacion, comentario);
+                    logger.info('[DEBUG-EMAIL] Correo de reseña enviado exitosamente.');
+                } else {
+                    logger.info('[DEBUG-EMAIL] El dueño no tiene correo o no se encontró dueño válido.');
                 }
             }
         } catch (emailErr) {
+            logger.error(`[DEBUG-EMAIL] Error en bloque de correo: ${emailErr.message}`);
             logger.warn('No se pudo enviar email de reseña:', emailErr.message);
         }
 

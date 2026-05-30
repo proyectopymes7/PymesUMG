@@ -278,6 +278,23 @@ app.listen(PORT, async () => {
   } catch (err) {
     logger.error('Failed to drop estado constraint:', err.message);
   }
+
+  // Add reset_token columns to Usuarios if they don't exist
+  try {
+    const pool = await connectDB();
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Usuarios') AND name = 'reset_token')
+        ALTER TABLE Usuarios ADD reset_token VARCHAR(100) NULL;
+      IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('Usuarios') AND name = 'reset_token_expires')
+        ALTER TABLE Usuarios ADD reset_token_expires DATETIME2 NULL;
+    `);
+    logger.info('reset_token columns ready');
+  } catch (err) {
+    logger.error('Failed to add reset_token columns:', err.message);
+  }
+
 });
 
 module.exports = app;
+
+

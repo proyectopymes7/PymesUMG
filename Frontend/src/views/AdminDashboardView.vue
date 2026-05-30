@@ -117,11 +117,10 @@ const deletingId         = ref(null)
 
 const authStore = useAuthStore()
 
-// Computed variable to check for authentication token
 const hasToken = computed(() => !!localStorage.getItem('token'))
 
 const fetchData = async () => {
-  if (loading.value) return; // Prevent concurrent fetches
+  if (loading.value) return;
   
   loading.value = true
   try {
@@ -153,14 +152,14 @@ const switchTab = (tabName) => {
   }
 }
 
-// Handler para Requests (Pendientes)
+// ── FIX: approve envía 'APROBADO' para que el backend mande el correo correcto ──
 const handleAction = async (id, action) => {
   if (!hasToken.value) {
     showToast('Debes iniciar sesión para realizar esta acción', 'error')
     return
   }
   
-  const estado = action === 'approve' ? 'activo' : 'rechazado'
+  const estado = action === 'approve' ? 'APROBADO' : 'rechazado'
   try {
     await updateBusinessStatus(id, estado)
     await fetchData()
@@ -172,7 +171,6 @@ const handleAction = async (id, action) => {
   }
 }
 
-// Handler para Switch Toggle de Negocios Activos/Inactivos con Optimistic Update
 const toggleBusinessStatus = async (business) => {
   if (!hasToken.value) {
     showToast('Debes iniciar sesión para realizar esta acción', 'error')
@@ -185,7 +183,6 @@ const toggleBusinessStatus = async (business) => {
   const newStatus = isActive ? 'inactivo' : 'activo'
   const previousStatus = business.status
   
-  // Optimistic update
   business.status = newStatus
   updatingBusinessId.value = business.id
   
@@ -194,7 +191,6 @@ const toggleBusinessStatus = async (business) => {
     showToast(`Negocio ${newStatus === 'activo' ? 'activado' : 'desactivado'}`)
   } catch (error) {
     console.error(error)
-    // Revert on error
     business.status = previousStatus
     const errorMsg = error.response?.data?.message || 'Error al cambiar estado del negocio'
     showToast(errorMsg, 'error')
@@ -227,7 +223,6 @@ const openBusinessEdit = (business) => {
 
 const handleBusinessSaved = (updatedBusiness) => {
   showBusinessModal.value = false
-  // Update local list
   const index = allBusinesses.value.findIndex(b => b.id === updatedBusiness.id)
   if (index !== -1) {
     allBusinesses.value[index] = { ...allBusinesses.value[index], ...updatedBusiness }
@@ -253,26 +248,24 @@ const changeUserRole = async (userId, newRoleId) => {
   newRoleId = parseInt(newRoleId)
   const user = allUsers.value.find(u => u.id_usuario === userId)
   const prevRole = user?.id_rol
-  if (user) user.id_rol = newRoleId   // optimistic update
+  if (user) user.id_rol = newRoleId
   updatingRoleId.value = userId
   try {
     await updateUserRole(userId, newRoleId)
     showToast('Rol actualizado')
   } catch (error) {
-    if (user) user.id_rol = prevRole  // revert
+    if (user) user.id_rol = prevRole
     showToast(error.response?.data?.message || 'Error al cambiar el rol', 'error')
   } finally {
     updatingRoleId.value = null
   }
 }
 
-// Expandir solicitudes
 const expandedRequestId = ref(null)
 const toggleExpand = (id) => {
   expandedRequestId.value = expandedRequestId.value === id ? null : id
 }
 
-// Cambiar foto de usuario desde el panel admin
 import { uploadImage } from '../services/businessService'
 const uploadingPhotoUserId = ref(null)
 
@@ -294,7 +287,6 @@ const handleAdminPhotoChange = async (userId, event) => {
     event.target.value = ''
   }
 }
-
 
 onMounted(fetchData)
 </script>
@@ -323,7 +315,6 @@ onMounted(fetchData)
         </div>
       </div>
 
-      <!-- Content -->
       <div v-if="loading && (!allBusinesses.length && !pendingRequests.length && !allUsers.length)" class="flex justify-center py-20">
         <div class="w-12 h-12 border-4 border-fiery-red border-t-transparent rounded-full animate-spin"></div>
       </div>
@@ -337,7 +328,6 @@ onMounted(fetchData)
           <div v-for="req in pendingRequests" :key="req.id"
             class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-xl transition-all">
 
-            <!-- Fila principal -->
             <div class="p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
               <div class="w-full md:w-40 h-28 rounded-2xl overflow-hidden bg-slate-100 flex-shrink-0">
                 <img :src="req.image" class="w-full h-full object-cover" />
@@ -373,7 +363,6 @@ onMounted(fetchData)
               </div>
             </div>
 
-            <!-- Panel expandido -->
             <transition name="expand">
               <div v-if="expandedRequestId === req.id"
                 class="border-t border-slate-100 bg-slate-50 px-6 md:px-8 py-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -416,7 +405,6 @@ onMounted(fetchData)
 
         <!-- Businesses Tab -->
         <div v-if="activeTab === 'businesses'" class="space-y-4">
-          <!-- Buscador -->
           <div class="relative">
             <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input
@@ -428,23 +416,11 @@ onMounted(fetchData)
             <button v-if="businessSearch" @click="businessSearch = ''" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-lg leading-none">&times;</button>
           </div>
 
-          <!-- Filtros de estado -->
           <div class="flex items-center gap-2 flex-wrap">
-            <button
-              @click="businessFilter = 'todos'"
-              :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'todos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
-            >Todos <span class="opacity-60">({{ allBusinesses.length }})</span></button>
-            <button
-              @click="businessFilter = 'activos'"
-              :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'activos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
-            >Activos <span class="opacity-60">({{ countActivos }})</span></button>
-            <button
-              @click="businessFilter = 'inactivos'"
-              :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'inactivos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']"
-            >Inactivos <span class="opacity-60">({{ countInactivos }})</span></button>
-            <span v-if="businessSearch" class="text-xs text-slate-400 ml-1">
-              {{ filteredBusinesses.length }} resultado{{ filteredBusinesses.length !== 1 ? 's' : '' }}
-            </span>
+            <button @click="businessFilter = 'todos'" :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'todos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']">Todos <span class="opacity-60">({{ allBusinesses.length }})</span></button>
+            <button @click="businessFilter = 'activos'" :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'activos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']">Activos <span class="opacity-60">({{ countActivos }})</span></button>
+            <button @click="businessFilter = 'inactivos'" :class="['px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all', businessFilter === 'inactivos' ? 'bg-fiery-navy text-white shadow-md' : 'bg-white text-slate-400 border border-slate-200 hover:text-slate-600']">Inactivos <span class="opacity-60">({{ countInactivos }})</span></button>
+            <span v-if="businessSearch" class="text-xs text-slate-400 ml-1">{{ filteredBusinesses.length }} resultado{{ filteredBusinesses.length !== 1 ? 's' : '' }}</span>
           </div>
 
           <!-- Mobile cards -->
@@ -514,21 +490,11 @@ onMounted(fetchData)
                     </div>
                   </td>
                   <td class="px-6 md:px-8 py-5 text-sm text-slate-500 font-bold uppercase text-[10px]">{{ business.category }}</td>
-
                   <td class="px-6 md:px-8 py-5 text-center">
                     <div class="flex items-center justify-center">
-                      <button
-                        @click="toggleBusinessStatus(business)"
-                        :disabled="updatingBusinessId === business.id"
-                        :class="[
-                          'relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none',
-                          (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'bg-emerald-500' : 'bg-red-400'
-                        ]"
-                      >
-                        <span :class="[
-                          'pointer-events-none relative inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition-transform duration-300 ease-in-out',
-                          (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'translate-x-5' : 'translate-x-0'
-                        ]">
+                      <button @click="toggleBusinessStatus(business)" :disabled="updatingBusinessId === business.id"
+                        :class="['relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none', (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'bg-emerald-500' : 'bg-red-400']">
+                        <span :class="['pointer-events-none relative inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition-transform duration-300 ease-in-out', (business.status?.toLowerCase() === 'activo' || business.status?.toLowerCase() === 'aprobado') ? 'translate-x-5' : 'translate-x-0']">
                           <svg v-if="updatingBusinessId === business.id" class="animate-spin h-4 w-4 text-emerald-500 absolute top-1 left-1" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
@@ -537,10 +503,7 @@ onMounted(fetchData)
                       </button>
                     </div>
                   </td>
-
-                  <!-- Acciones -->
                   <td class="px-6 md:px-8 py-5 text-right">
-                    <!-- Confirmación eliminar (inline) -->
                     <div v-if="deleteConfirmId === business.id" class="flex items-center justify-end gap-2">
                       <span class="text-xs font-black text-red-600">¿Eliminar permanentemente?</span>
                       <button @click="cancelDelete" class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">No</button>
@@ -550,7 +513,6 @@ onMounted(fetchData)
                         Sí, eliminar
                       </button>
                     </div>
-                    <!-- Botones normales -->
                     <div v-else class="flex items-center justify-end gap-2">
                       <button @click="openBusinessEdit(business)"
                         class="inline-flex items-center gap-1.5 bg-fiery-navy text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-opacity">
@@ -558,8 +520,7 @@ onMounted(fetchData)
                         Editar
                       </button>
                       <button v-if="authStore.isSuperAdmin" @click="confirmDeleteBusiness(business.id)"
-                        class="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors border border-red-100"
-                        title="Eliminar negocio">
+                        class="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors border border-red-100" title="Eliminar negocio">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                       </button>
                     </div>
@@ -571,9 +532,8 @@ onMounted(fetchData)
           </div>
         </div>
 
-        <!-- Users Tab (Super Admin Only) -->
+        <!-- Users Tab -->
         <div v-if="activeTab === 'users'">
-
           <!-- Mobile cards -->
           <div class="md:hidden space-y-3">
             <div v-for="user in allUsers" :key="user.id_usuario" class="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm">
@@ -625,24 +585,18 @@ onMounted(fetchData)
               </thead>
               <tbody class="divide-y divide-slate-50">
                 <tr v-for="user in allUsers" :key="user.id_usuario" class="hover:bg-slate-50 transition-colors">
-                  <!-- Avatar + nombre -->
                   <td class="px-6 md:px-8 py-4">
                     <div class="flex items-center gap-3">
-                      <!-- Avatar clickeable -->
                       <label :for="`photo-${user.id_usuario}`" class="relative w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-slate-100 cursor-pointer group">
                         <img v-if="user.foto_perfil" :src="user.foto_perfil" class="w-full h-full object-cover" />
-                        <div v-else class="w-full h-full bg-fiery-navy flex items-center justify-center text-white font-black text-sm uppercase">
-                          {{ user.nombre?.[0] || '?' }}
-                        </div>
-                        <!-- Overlay cámara -->
+                        <div v-else class="w-full h-full bg-fiery-navy flex items-center justify-center text-white font-black text-sm uppercase">{{ user.nombre?.[0] || '?' }}</div>
                         <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                           <div v-if="uploadingPhotoUserId === user.id_usuario" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                           <svg v-else class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
                           </svg>
                         </div>
-                        <input :id="`photo-${user.id_usuario}`" type="file" accept="image/*" class="hidden"
-                          @change="handleAdminPhotoChange(user.id_usuario, $event)" />
+                        <input :id="`photo-${user.id_usuario}`" type="file" accept="image/*" class="hidden" @change="handleAdminPhotoChange(user.id_usuario, $event)" />
                       </label>
                       <div>
                         <p class="text-sm font-bold text-fiery-navy uppercase tracking-tighter leading-none">{{ user.nombre }} {{ user.apellido }}</p>
@@ -650,31 +604,20 @@ onMounted(fetchData)
                       </div>
                     </div>
                   </td>
-
-                  <!-- Rol actual badge -->
                   <td class="px-6 md:px-8 py-4">
-                    <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest" :class="roleBadge(user.id_rol).color">
-                      {{ roleBadge(user.id_rol).label }}
-                    </span>
+                    <span class="px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest" :class="roleBadge(user.id_rol).color">{{ roleBadge(user.id_rol).label }}</span>
                   </td>
-
-                  <!-- Selector de rol -->
                   <td class="px-6 md:px-8 py-4 text-right">
                     <div class="flex items-center justify-end gap-3">
                       <div class="relative">
-                        <select
-                          :value="user.id_rol"
-                          :disabled="updatingRoleId === user.id_usuario"
+                        <select :value="user.id_rol" :disabled="updatingRoleId === user.id_usuario"
                           @change="changeUserRole(user.id_usuario, $event.target.value)"
-                          class="appearance-none pl-3 pr-8 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:border-fiery-navy hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50"
-                        >
+                          class="appearance-none pl-3 pr-8 py-2 rounded-xl border border-slate-200 bg-white text-[10px] font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:border-fiery-navy hover:border-slate-300 transition-all cursor-pointer disabled:opacity-50">
                           <option v-for="role in ROLES" :key="role.id" :value="role.id">{{ role.label }}</option>
                         </select>
                         <div class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2">
                           <div v-if="updatingRoleId === user.id_usuario" class="w-3 h-3 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                          <svg v-else class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
-                          </svg>
+                          <svg v-else class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                         </div>
                       </div>
                     </div>
@@ -688,8 +631,6 @@ onMounted(fetchData)
 
         <!-- ── Tab: Categorías ── -->
         <div v-if="activeTab === 'categories'" class="space-y-6">
-
-          <!-- Header -->
           <div class="flex items-center justify-between">
             <h3 class="text-sm font-black text-slate-500 uppercase tracking-widest">Gestión de Categorías</h3>
             <button v-if="!showCatForm" @click="openNewCat"
@@ -698,7 +639,6 @@ onMounted(fetchData)
             </button>
           </div>
 
-          <!-- Formulario inline -->
           <div v-if="showCatForm" class="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-sm">
             <h4 class="text-xs font-black text-fiery-navy uppercase">{{ editingCat ? 'Editar Categoría' : 'Nueva Categoría' }}</h4>
             <input v-model="catForm.nombre" placeholder="Nombre *" type="text"
@@ -723,7 +663,6 @@ onMounted(fetchData)
             </div>
           </div>
 
-          <!-- Lista -->
           <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
             <div v-for="cat in allCategories" :key="cat.id_categoria"
               class="flex items-center gap-4 px-6 py-4 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
@@ -754,7 +693,6 @@ onMounted(fetchData)
       </div>
     </main>
 
-    <!-- Modals -->
     <EditBusinessModal 
       :show="showBusinessModal" 
       :business="selectedBusiness" 
@@ -762,18 +700,10 @@ onMounted(fetchData)
       @saved="handleBusinessSaved"
     />
 
-
-    <!-- Local Toast Container -->
     <div class="fixed bottom-6 right-6 z-[200] flex flex-col gap-3 pointer-events-none">
       <TransitionGroup name="toast">
-        <div 
-          v-for="toast in toasts" 
-          :key="toast.id"
-          :class="[
-            'px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 w-80 pointer-events-auto',
-            toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
-          ]"
-        >
+        <div v-for="toast in toasts" :key="toast.id"
+          :class="['px-6 py-4 rounded-2xl shadow-xl flex items-center gap-3 w-80 pointer-events-auto', toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white']">
           <div class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
             <svg v-if="toast.type === 'success'" class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
             <svg v-else class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -787,20 +717,11 @@ onMounted(fetchData)
 
 <style scoped>
 .font-outfit { font-family: 'Outfit', sans-serif; }
-.custom-scrollbar::-webkit-scrollbar {
-  height: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #e2e8f0;
-  border-radius: 10px;
-}
+.custom-scrollbar::-webkit-scrollbar { height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e2e8f0; border-radius: 10px; }
 .toast-enter-active, .toast-leave-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(30px) scale(0.95); }
-
-/* Expand solicitud */
 .expand-enter-active { transition: all 0.2s ease-out; }
 .expand-leave-active { transition: all 0.15s ease-in; }
 .expand-enter-from, .expand-leave-to { opacity: 0; transform: translateY(-8px); }

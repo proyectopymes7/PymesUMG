@@ -538,11 +538,7 @@ const executeDelete = async (id) => {
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-xs font-black text-slate-400 uppercase tracking-widest">Descripción</label>
                 <div class="flex items-center gap-2">
-                  <button type="button" @click="showBizImageSuggest = true"
-                    :disabled="!formData.name?.trim()"
-                    class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
-                    ✦ Foto con IA
-                  </button>
+                  
                   <button type="button" @click="generateBusinessDescription"
                     :disabled="!formData.name?.trim() || generatingBizDesc"
                     class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
