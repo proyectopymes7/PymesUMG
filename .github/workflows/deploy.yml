@@ -1,0 +1,54 @@
+name: Production Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update repository
+        run: |
+          cd /var/www/pymes-temp
+          git pull origin master
+
+      - name: Sync backend
+        run: |
+          rsync -av --delete --exclude='.env' \
+          /var/www/pymes-temp/Backend/ \
+          /var/www/backend/
+
+      - name: Install backend dependencies
+        run: |
+          cd /var/www/backend
+          npm install
+
+      - name: Restart backend API
+        run: |
+          pm2 restart backend-api
+
+      - name: Sync frontend
+        run: |
+          rsync -av --delete \
+          /var/www/pymes-temp/Frontend/ \
+          /var/www/frontend/
+
+      - name: Install frontend dependencies
+        run: |
+          cd /var/www/frontend
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd /var/www/frontend
+          npm run build
+
+      - name: Restart Nginx
+        run: |
+          sudo systemctl restart nginx
