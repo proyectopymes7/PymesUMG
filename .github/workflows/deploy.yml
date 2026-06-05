@@ -31,7 +31,7 @@ jobs:
 
       - name: Restart backend API
         run: |
-          pm2 restart backend-api
+          pm2 restart backend
 
       - name: Sync frontend
         run: |
