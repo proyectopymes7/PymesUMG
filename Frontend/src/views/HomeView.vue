@@ -222,8 +222,8 @@ onUnmounted(() => {
             Explorar el Directorio
           </RouterLink>
         </div>
-        <div class="hidden lg:flex justify-end absolute right-0 bottom-[-230px] z-50 pointer-events-none w-[50%]">
-          <img src="https://pymesadmin.blob.core.windows.net/imagenes/84f5d8ba-92a4-496e-9006-5bec387cd30f.png" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" />
+        <div class="hidden lg:flex justify-end absolute right-0 bottom-[-50px] z-50 pointer-events-none w-[50%]">
+          <img src="https://pymesadmin.blob.core.windows.net/imagenes/0cef3940-9868-4a35-81e6-c8363030a9e4.png" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" />
         </div>
       </div>
     </section>
@@ -492,7 +492,7 @@ onUnmounted(() => {
 
       <div class="container mx-auto px-6 relative z-10">
         <div class="text-center mb-28 reveal-on-scroll transition-all duration-1000" :class="revealedElements.has('reveal-3') ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0'">
-          <h4 class="text-fiery-red font-black uppercase tracking-[0.4em] text-xs mb-4">Experiencia AquíTenes</h4>
+          <h4 class="text-fiery-red font-black uppercase tracking-[0.4em] text-xs mb-4">Experiencia AquíTenés</h4>
           <h2 class="text-5xl md:text-7xl font-black text-fiery-navy font-outfit uppercase tracking-tighter">¿Cómo <span class="text-fiery-red">funciona</span>?</h2>
         </div>
 
