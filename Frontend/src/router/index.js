@@ -11,6 +11,7 @@ import BusinessRegisterView from '../views/BusinessRegisterView.vue'
 import TraderView from '../views/TraderView.vue'
 import { useAuthStore } from '../stores/auth'
 import ImageUploadTestView from '../views/ImageUploadTestView.vue'
+import ResetPasswordView from '../views/ResetPasswordView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -76,6 +77,12 @@ const router = createRouter({
       path: '/test-upload',
       name: 'test-upload',
       component: ImageUploadTestView
+    },
+
+    {
+      path: '/reset-password',
+      name: 'reset-password',
+      component: ResetPasswordView
     }
   ]
 })

@@ -79,6 +79,24 @@ const loadingImages = ref(false)
 const generatingDesc = ref(false)
 const generatingBizDesc = ref(false)
 const showBizImageSuggest = ref(false)
+const bizLogoPreview = ref(null)
+const bizLogoInputRef = ref(null)
+const bizLogoUploading = ref(false)
+
+const handleBizLogoChange = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  bizLogoUploading.value = true
+  try {
+    const { uploadImage } = await import('../../services/businessService')
+    const url = await uploadImage(file, 'logos')
+    bizLogoPreview.value = url
+    await api.put(`/emprendimientos/${props.business.id}`, { logo_url: url })
+    showToast('Foto actualizada')
+    emit('saved', { ...props.business, logo: url, image: url })
+  } catch { showToast('Error al subir la foto', 'error') }
+  finally { bizLogoUploading.value = false; if (bizLogoInputRef.value) bizLogoInputRef.value.value = '' }
+}
 const showProdImageSuggest = ref(false)
 
 const onBizImageSuggested = async (url) => {
@@ -194,6 +212,7 @@ watch(() => props.show, async (newVal) => {
     deletingId.value = null
     existingProductImages.value = []
     newImageFiles.value = []
+    bizLogoPreview.value = props.business?.logo || props.business?.image || null
 
     // Strip https://wa.me/ prefix — backend stores/validates the raw number
     const rawWhatsapp = (props.business.socials?.whatsapp || '').replace('https://wa.me/', '')
@@ -482,6 +501,33 @@ const executeDelete = async (id) => {
         
         <!-- Tab: Información General -->
         <div v-show="activeTab === 'general'" class="space-y-6">
+
+          <!-- Foto del negocio -->
+          <div>
+            <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Foto del Negocio</label>
+            <div class="flex items-center gap-4">
+              <div class="w-20 h-20 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 flex-shrink-0">
+                <img v-if="bizLogoPreview" :src="bizLogoPreview" class="w-full h-full object-cover" />
+                <div v-else class="w-full h-full flex items-center justify-center text-slate-300">
+                  <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+              </div>
+              <div class="flex flex-col gap-2">
+                <input type="file" ref="bizLogoInputRef" accept="image/*" class="hidden" @change="handleBizLogoChange" />
+                <button type="button" @click="bizLogoInputRef?.click()"
+                  class="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  Cambiar foto
+                </button>
+                <button type="button" @click="showBizImageSuggest = true"
+                  class="flex items-center gap-2 px-4 py-2 rounded-xl bg-fiery-navy/10 text-fiery-navy text-xs font-black uppercase tracking-widest hover:bg-fiery-navy hover:text-white transition-colors">
+                  ✦ Sugerir con IA
+                </button>
+              </div>
+              <span v-if="bizLogoUploading" class="text-xs text-slate-400">Subiendo...</span>
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div class="md:col-span-2">
               <label class="block text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Nombre del Negocio</label>
@@ -492,11 +538,7 @@ const executeDelete = async (id) => {
               <div class="flex items-center justify-between mb-2">
                 <label class="block text-xs font-black text-slate-400 uppercase tracking-widest">Descripción</label>
                 <div class="flex items-center gap-2">
-                  <button type="button" @click="showBizImageSuggest = true"
-                    :disabled="!formData.name?.trim()"
-                    class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">
-                    ✦ Foto con IA
-                  </button>
+                  
                   <button type="button" @click="generateBusinessDescription"
                     :disabled="!formData.name?.trim() || generatingBizDesc"
                     class="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all disabled:opacity-40 disabled:cursor-not-allowed bg-fiery-navy/10 text-fiery-navy hover:bg-fiery-navy hover:text-white">

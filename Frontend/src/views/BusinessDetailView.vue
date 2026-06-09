@@ -105,7 +105,6 @@ onMounted(async () => {
 
   try {
     const all = await getBusinessProducts(route.params.id)
-    // Cargar imagen real de cada producto antes de mostrar
     await Promise.all(all.map(async (p) => {
       try {
         const imgs = await getProductImages(p.id_producto)
@@ -153,15 +152,9 @@ const submitReview = async () => {
       comentario: reviewForm.value.comentario,
       calificacion: reviewForm.value.calificacion
     })
-    reviews.value.unshift({
-      id_calificacion: Date.now(),
-      usuario_nombre: authStore.user?.nombre,
-      usuario_apellido: authStore.user?.apellido,
-      puntuacion: reviewForm.value.calificacion,
-      comentario: reviewForm.value.comentario,
-      fecha_calificacion: new Date().toISOString()
-    })
     reviewSuccess.value = true
+    // Recargar reseñas desde el backend para tener foto, id_usuario y datos completos
+    reviews.value = await getBusinessReviews(route.params.id)
     setTimeout(() => closeReviewModal(), 2000)
   } catch (error) {
     reviewError.value = error.response?.data?.message || 'Error al publicar la reseña. Intenta de nuevo.'
@@ -197,7 +190,6 @@ const submitReview = async () => {
               <img :src="business.logo" :alt="business.name" class="w-full h-full object-cover rounded-[1.8rem]" />
             </div>
             <div class="bg-fiery-navy rounded-[2rem] p-4 md:p-6 text-center text-white w-full max-w-[200px] md:max-w-none">
-              <!-- Con reseñas: número + estrellas llenas -->
               <template v-if="averageRating">
                 <div class="text-2xl md:text-4xl font-black mb-1">{{ averageRating }}</div>
                 <div class="flex justify-center text-yellow-400 mb-1 md:mb-2">
@@ -205,7 +197,6 @@ const submitReview = async () => {
                 </div>
                 <div class="text-[10px] md:text-xs font-bold text-fiery-cream/60 uppercase tracking-widest">{{ reviewCount }} reseñas</div>
               </template>
-              <!-- Sin reseñas: solo una estrella vacía -->
               <template v-else>
                 <svg class="w-8 h-8 md:w-10 md:h-10 mx-auto text-white/30" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                 <div class="text-[10px] md:text-xs font-bold text-fiery-cream/40 uppercase tracking-widest mt-2">Sin reseñas</div>
@@ -322,7 +313,6 @@ const submitReview = async () => {
                 Ubicación
               </h3>
 
-              <!-- Mapa con botón Ampliar -->
               <div class="relative w-full rounded-[1.5rem] overflow-hidden border-2 border-white/10" style="height:180px">
                 <iframe v-if="mapUrl" :src="mapUrl" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
                 <button
@@ -342,7 +332,7 @@ const submitReview = async () => {
           </div>
         </div>
 
-        <!-- Reviews: full-width con productos, o col-span-2 sin ellos -->
+        <!-- Reviews -->
         <div :class="hasItems ? 'lg:col-span-3 pt-8 md:pt-12' : 'lg:col-span-2 pt-0'">
           <div class="space-y-8">
 
@@ -392,7 +382,6 @@ const submitReview = async () => {
                   </div>
                 </div>
                 <p v-if="review.comentario" class="text-slate-600 text-base md:text-lg italic">"{{ review.comentario }}"</p>
-                <!-- Confirmación inline de eliminación -->
                 <div v-if="deletingReviewId === review.id_calificacion" class="mt-3 flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-4 py-2.5">
                   <span class="text-sm font-bold text-red-700 flex-1">¿Eliminar tu reseña?</span>
                   <button @click="deletingReviewId = null" class="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">Cancelar</button>
@@ -414,7 +403,6 @@ const submitReview = async () => {
         @click.self="showProductModal = false">
         <div class="bg-white rounded-3xl w-full max-w-lg max-h-[88vh] overflow-y-auto shadow-2xl flex flex-col">
 
-          <!-- Imagen / carrusel (solo para productos) -->
           <div v-if="selectedProduct.tipo !== 'servicio'" class="relative bg-slate-100 rounded-t-3xl overflow-hidden" style="min-height:220px">
             <template v-if="productImages.length > 0">
               <img :src="productImages[productImageIdx].url" :alt="selectedProduct.nombre"
@@ -445,13 +433,11 @@ const submitReview = async () => {
             <button @click="showProductModal = false"
               class="absolute top-3 right-3 w-8 h-8 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white rounded-full flex items-center justify-center font-bold text-lg transition-colors leading-none">×</button>
           </div>
-          <!-- Botón cerrar para servicios (sin imagen) -->
           <div v-else class="flex justify-end p-4">
             <button @click="showProductModal = false"
               class="w-8 h-8 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-full flex items-center justify-center font-bold text-lg transition-colors leading-none">×</button>
           </div>
 
-          <!-- Contenido -->
           <div class="p-6 space-y-3">
             <div class="flex items-start justify-between gap-3">
               <div>
@@ -510,8 +496,10 @@ const submitReview = async () => {
           <div class="p-6 space-y-6 flex-1">
 
             <div v-if="authStore.isAuthenticated" class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-xl bg-fiery-navy text-white flex items-center justify-center font-black text-sm uppercase flex-shrink-0">
-                {{ authStore.userInitial }}
+             <div class="w-10 h-10 rounded-xl bg-fiery-navy text-white flex items-center justify-center font-black text-sm uppercase flex-shrink-0 overflow-hidden">
+  <img v-if="authStore.user?.foto_perfil" :src="authStore.user.foto_perfil" class="w-full h-full object-cover" />
+  <span v-else>{{ authStore.userInitial }}</span>
+
               </div>
               <div>
                 <p class="font-black text-fiery-navy text-sm">{{ authStore.userFullName }}</p>

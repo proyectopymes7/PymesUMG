@@ -2,7 +2,7 @@ const { body, validationResult } = require('express-validator');
 const Emprendimiento = require('../models/Emprendimiento');
 const User = require('../models/User');
 const logger = require('../utils/logger');
-const { sendBusinessApproved, sendBusinessRejected, sendNewBusinessRequest } = require('../utils/EmailService');
+const { sendBusinessApproved, sendBusinessRejected, sendNewBusinessRequest, sendBusinessDeactivated, sendBusinessActivated } = require('../utils/EmailService');
 
 const isAdmin = (user) => user && (user.id_rol === 1 || user.id_rol === 2);
 const isOwner = (user, emp) => user && user.id_usuario === emp.id_usuario;
@@ -159,16 +159,20 @@ const updateEmprendimiento = async (req, res) => {
     }
 
     const updateData = req.body;
+    const nuevoEstado = updateData.estado?.toLowerCase()
+    const estadoActual = emprendimiento.estado?.toLowerCase()
 
-    // Auto-promote Visitante (4) → Emprendedor (3) when business is approved
-    const estadoNorm = updateData.estado?.toLowerCase()
-    if (estadoNorm === 'activo' || estadoNorm === 'aprobado') {
+    logger.info(`[DEBUG-EMAILS] updateData.estado recibido: ${updateData.estado}`);
+    logger.info(`[DEBUG-EMAILS] nuevoEstado: ${nuevoEstado}, estadoActual: ${estadoActual}`);
+
+    // ── Lógica de correos separada por caso ────────────────
+    if (nuevoEstado === 'aprobado') {
+      // Aprobación inicial desde pendiente → promover rol y correo de aprobación
       const owner = await User.findById(emprendimiento.id_usuario);
       if (owner && owner.id_rol === 4) {
         await User.updateRole(emprendimiento.id_usuario, 3);
-        logger.info(`User promoted to Emprendedor: ${owner.nombre_usuario || owner.correo}`);
+        logger.info(`User promoted to Emprendedor: ${owner.correo}`);
       }
-      // Send approval email if user has email
       if (owner && owner.correo) {
         try {
           await sendBusinessApproved(owner.correo, owner.nombre, emprendimiento.nombre);
@@ -177,17 +181,40 @@ const updateEmprendimiento = async (req, res) => {
           logger.warn(`Failed to send approval email: ${emailErr.message}`);
         }
       }
-    }
 
-    // Send rejection email
-    if (updateData.estado === 'rechazado') {
+    } else if (nuevoEstado === 'rechazado') {
+      // Rechazo → correo de rechazo
       const owner = await User.findById(emprendimiento.id_usuario);
-      if (owner) {
+      if (owner && owner.correo) {
         try {
           await sendBusinessRejected(owner.correo, owner.nombre, emprendimiento.nombre);
           logger.info(`Rejection email sent to: ${owner.correo}`);
         } catch (emailErr) {
           logger.warn(`Failed to send rejection email: ${emailErr.message}`);
+        }
+      }
+
+    } else if (nuevoEstado === 'inactivo') {
+      // Desactivación → correo de desactivación
+      const owner = await User.findById(emprendimiento.id_usuario);
+      if (owner && owner.correo) {
+        try {
+          await sendBusinessDeactivated(owner.correo, owner.nombre, emprendimiento.nombre);
+          logger.info(`Deactivation email sent to: ${owner.correo}`);
+        } catch (emailErr) {
+          logger.warn(`Failed to send deactivation email: ${emailErr.message}`);
+        }
+      }
+
+    } else if (nuevoEstado === 'activo' && estadoActual === 'inactivo') {
+      // Reactivación desde inactivo → correo de reactivación
+      const owner = await User.findById(emprendimiento.id_usuario);
+      if (owner && owner.correo) {
+        try {
+          await sendBusinessActivated(owner.correo, owner.nombre, emprendimiento.nombre);
+          logger.info(`Reactivation email sent to: ${owner.correo}`);
+        } catch (emailErr) {
+          logger.warn(`Failed to send reactivation email: ${emailErr.message}`);
         }
       }
     }
@@ -370,7 +397,7 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado', 'APROBADO'])
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado', 'APROBADO', 'aprobado'])
       .withMessage('Estado inválido'),
     body('departamento').optional().trim().isLength({ max: 100 }).withMessage('Departamento max 100 chars'),
     body('municipio').optional().trim().isLength({ max: 100 }).withMessage('Municipio max 100 chars'),
@@ -415,7 +442,7 @@ module.exports = {
       .withMessage('Horario cannot exceed 200 characters'),
     body('estado')
       .optional()
-      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado', 'APROBADO'])
+      .isIn(['activo', 'inactivo', 'pendiente', 'rechazado', 'borrado', 'APROBADO', 'aprobado'])
       .withMessage('Estado inválido'),
     body('departamento').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),
     body('municipio').optional({ checkFalsy: true }).trim().isLength({ max: 100 }),

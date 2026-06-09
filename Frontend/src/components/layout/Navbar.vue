@@ -56,7 +56,7 @@ const goToProfile = () => {
       <!-- Logo -->
       <RouterLink to="/" class="flex items-center gap-3 group">
         <img :src="umgLogo" alt="UMG" class="w-10 h-10 md:w-12 md:h-12 object-contain" />
-        <span class="font-black text-xl md:text-2xl tracking-tighter font-outfit uppercase">Aquí<span class="text-fiery-red">TENES</span></span>
+        <span class="font-black text-xl md:text-2xl tracking-tighter font-outfit uppercase">Aquí<span class="text-fiery-red">TENÉS</span></span>
       </RouterLink>
 
       <!-- Desktop Menu Links -->

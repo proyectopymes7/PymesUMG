@@ -369,6 +369,9 @@ const forgotPassword = async (req, res) => {
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000);
 
+    console.log('DEBUG forgotPassword - usuario encontrado:', user?.id_usuario, user?.correo)
+    console.log('DEBUG resetToken:', resetToken)
+
     await User.update(user.id_usuario, {
       reset_token: resetToken,
       reset_token_expires: resetExpires
