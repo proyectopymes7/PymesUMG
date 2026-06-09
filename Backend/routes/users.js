@@ -3,8 +3,8 @@ const router = express.Router();
 const { auth, authorize } = require('../middleware/auth');
 const User = require('../models/User');
 
-// Admin only routes
-router.get('/', auth, authorize('admin'), async (req, res) => {
+// Super admin only routes
+router.get('/', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
@@ -30,7 +30,7 @@ router.get('/', auth, authorize('admin'), async (req, res) => {
   }
 });
 
-router.get('/:id', auth, authorize('admin'), async (req, res) => {
+router.get('/:id', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     
@@ -54,7 +54,7 @@ router.get('/:id', auth, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/:id', auth, authorize('admin'), async (req, res) => {
+router.put('/:id', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const { nombre, apellido, telefono, foto_perfil } = req.body;
     const updateData = {};
@@ -90,7 +90,7 @@ router.put('/:id/role', auth, authorize('superadministrador'), async (req, res) 
   }
 });
 
-router.put('/:id/status', auth, authorize('admin'), async (req, res) => {
+router.put('/:id/status', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const { activo } = req.body;
     

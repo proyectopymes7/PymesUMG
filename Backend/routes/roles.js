@@ -42,7 +42,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Admin only routes
-router.post('/', auth, authorize('admin'), async (req, res) => {
+router.post('/', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const { nombre, descripcion } = req.body;
     
@@ -68,7 +68,7 @@ router.post('/', auth, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/:id', auth, authorize('admin'), async (req, res) => {
+router.put('/:id', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const { nombre, descripcion } = req.body;
     

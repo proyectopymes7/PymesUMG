@@ -166,7 +166,7 @@ router.post('/daily', auth, async (req, res) => {
 });
 
 // Admin only routes
-router.get('/dashboard', auth, authorize('admin'), async (req, res) => {
+router.get('/dashboard', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
