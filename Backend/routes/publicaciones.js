@@ -137,7 +137,7 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-router.put('/:id/resolve', auth, authorize('admin'), async (req, res) => {
+router.put('/:id/resolve', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const { estado, ip_admin } = req.body;
     

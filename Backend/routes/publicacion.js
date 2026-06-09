@@ -22,7 +22,7 @@ router.post('/', auth, validateCreatePublicacion, createPublicacion);
 router.put(
   '/:id/resolver',
   auth,
-  authorize('admin'),
+  authorize('superadministrador'),
   validateResolvePublicacion,
   resolvePublicacion
 );

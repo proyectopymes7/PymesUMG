@@ -77,7 +77,7 @@ router.post(
 router.delete(
     '/:id',
     auth,
-    authorize('admin'),
+    authorize('superadministrador'),
     [
         param('id')
             .isInt()

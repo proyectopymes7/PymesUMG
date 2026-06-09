@@ -203,7 +203,7 @@ router.put('/:id', auth, async (req, res) => {
 // });
 
 // Admin only routes
-router.put('/:id/approve', auth, authorize('admin'), async (req, res) => {
+router.put('/:id/approve', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const approvedValoracion = await Valoracion.approve(req.params.id);
     

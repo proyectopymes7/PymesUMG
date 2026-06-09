@@ -305,8 +305,8 @@ onMounted(fetchData)
         <div class="flex items-center gap-2 w-full lg:w-auto">
           <div class="flex flex-1 lg:flex-none bg-white p-1.5 rounded-2xl shadow-sm border border-slate-100 overflow-x-auto custom-scrollbar">
             <button @click="switchTab('requests')" :class="[activeTab === 'requests' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Solicitudes</button>
-            <button @click="switchTab('businesses')" :class="[activeTab === 'businesses' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Negocios</button>
-            <button @click="switchTab('users')" :class="[activeTab === 'users' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Usuarios</button>
+            <button v-if="authStore.isSuperAdmin" @click="switchTab('businesses')" :class="[activeTab === 'businesses' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Negocios</button>
+            <button v-if="authStore.isSuperAdmin" @click="switchTab('users')" :class="[activeTab === 'users' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Usuarios</button>
             <button @click="switchTab('categories')" :class="[activeTab === 'categories' ? 'bg-fiery-navy text-white shadow-lg' : 'text-slate-400 hover:text-slate-600', 'flex-1 px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap']">Categorías</button>
           </div>
           <button @click="fetchData()" :disabled="loading" title="Recargar datos de la pestaña actual" class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-100 text-fiery-navy hover:bg-slate-50 transition-colors shrink-0 disabled:opacity-50">
@@ -674,10 +674,10 @@ onMounted(fetchData)
                 {{ cat.activo ? 'Activa' : 'Inactiva' }}
               </span>
               <div class="flex gap-2 shrink-0">
-                <button @click="openEditCat(cat)" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-500 hover:text-fiery-navy transition-colors">
+                <button v-if="authStore.isSuperAdmin" @click="openEditCat(cat)" class="p-2 rounded-xl bg-slate-50 hover:bg-slate-200 text-slate-500 hover:text-fiery-navy transition-colors">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                 </button>
-                <button @click="toggleCatActive(cat)"
+                <button v-if="authStore.isSuperAdmin" @click="toggleCatActive(cat)"
                   :class="['p-2 rounded-xl transition-colors text-xs font-black', cat.activo ? 'bg-red-50 text-fiery-red hover:bg-red-100' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100']"
                   :title="cat.activo ? 'Desactivar' : 'Activar'">
                   {{ cat.activo ? '✕' : '✓' }}

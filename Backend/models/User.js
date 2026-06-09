@@ -228,6 +228,18 @@ class User {
       throw error;
     }
   }
+
+  static async findAdminEmails() {
+    const query = `
+      SELECT correo, nombre FROM Usuarios
+      WHERE id_rol IN (1, 2) AND activo = 1 AND correo IS NOT NULL;
+    `;
+    try {
+      return await executeQuery(query);
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = User;

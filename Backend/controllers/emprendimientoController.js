@@ -30,14 +30,17 @@ const createEmprendimiento = async (req, res) => {
       emprendimientoId: newEmprendimiento.id_emprendimiento
     });
 
-    // Notificar al admin sobre la nueva solicitud
+    // Notificar a todos los admins/superadmins sobre la nueva solicitud
     try {
+      const adminUsers = await User.findAdminEmails();
+      const adminEmails = adminUsers.map(u => u.correo);
       await sendNewBusinessRequest(
         fullEmprendimiento.nombre,
         req.user.nombre,
-        req.user.correo
+        req.user.correo,
+        adminEmails
       );
-      logger.info(`New business request email sent for: ${fullEmprendimiento.nombre}`);
+      logger.info(`New business request email sent to ${adminEmails.length} admin(s) for: ${fullEmprendimiento.nombre}`);
     } catch (emailErr) {
       logger.warn(`Failed to send new request email: ${emailErr.message}`);
     }

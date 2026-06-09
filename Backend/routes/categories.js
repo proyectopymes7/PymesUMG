@@ -107,7 +107,7 @@ router.post('/', auth, authorize('admin'), async (req, res) => {
   }
 });
 
-router.put('/:id', auth, authorize('admin'), async (req, res) => {
+router.put('/:id', auth, authorize('superadministrador'), async (req, res) => {
   try {
     const updateData = {};
     
@@ -138,7 +138,7 @@ router.put('/:id', auth, authorize('admin'), async (req, res) => {
   }
 });
 
-router.delete('/:id', auth, authorize('admin'), async (req, res) => {
+router.delete('/:id', auth, authorize('superadministrador'), async (req, res) => {
   try {
     await Categoria.update(req.params.id, { activo: false });
     res.json({ success: true, message: 'Category deactivated successfully' });
