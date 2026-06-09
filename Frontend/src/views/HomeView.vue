@@ -222,8 +222,8 @@ onUnmounted(() => {
             Explorar el Directorio
           </RouterLink>
         </div>
-        <div class="hidden lg:flex justify-end absolute right-0 bottom-[-50px] z-50 pointer-events-none w-[50%]">
-          <img src="https://pymesadmin.blob.core.windows.net/imagenes/0cef3940-9868-4a35-81e6-c8363030a9e4.png" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" />
+        <div class="hidden lg:flex justify-end absolute right-0 bottom-[-230px] z-50 pointer-events-none w-[50%]">
+          <img src="https://pymesadmin.blob.core.windows.net/imagenes/fe2d9cba-2c6a-4f44-ab7a-3cb06784d3e1.webp" class="w-full max-w-[700px] h-auto animate-float drop-shadow-2xl" />
         </div>
       </div>
     </section>
