@@ -12,6 +12,7 @@ router.post('/suggest-images', auth, async (req, res) => {
   if (!nombre) return res.status(400).json({ error: 'Nombre es requerido' });
 
   if (!PEXELS_KEY) return res.status(503).json({ error: 'Servicio de imágenes no configurado' });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'Servicio de IA no configurado' });
 
   try {
     // 1. OpenAI genera keywords de búsqueda en inglés
@@ -61,7 +62,13 @@ Rules:
     const photos = results.flat().slice(0, 6);
     res.json({ success: true, keywords, photos });
   } catch (err) {
-    console.error('Image suggestion error:', err.message);
+    console.error('Image suggestion error:', {
+      message: err.message,
+      status: err.status || err.response?.status,
+      code: err.code,
+      data: err.response?.data,
+      stack: err.stack
+    });
     res.status(500).json({ error: 'Error al sugerir imágenes' });
   }
 });
