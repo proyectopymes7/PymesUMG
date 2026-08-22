@@ -11,6 +11,7 @@ import BusinessRegisterView from '../views/BusinessRegisterView.vue'
 import TraderView from '../views/TraderView.vue'
 import { useAuthStore } from '../stores/auth'
 import ImageUploadTestView from '../views/ImageUploadTestView.vue'
+import MapTestView from '../views/MapTestView.vue'
 import ResetPasswordView from '../views/ResetPasswordView.vue'
 
 const router = createRouter({
@@ -77,6 +78,11 @@ const router = createRouter({
       path: '/test-upload',
       name: 'test-upload',
       component: ImageUploadTestView
+    },
+    {
+      path: '/test-map',
+      name: 'test-map',
+      component: MapTestView
     },
 
     {
