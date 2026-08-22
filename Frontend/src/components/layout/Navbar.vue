@@ -68,7 +68,7 @@ const goToProfile = () => {
           <span class="w-2 h-2 bg-fiery-red rounded-full animate-pulse"></span>
           Admin
         </RouterLink>
-        <RouterLink v-if="authStore.isEmprendedor || authStore.isAdmin" to="/mi-negocio" class="text-fiery-red hover:text-fiery-darkred transition-colors relative group py-2 flex items-center gap-2">
+        <RouterLink v-if="authStore.isEmprendedor || (authStore.isAdmin && authStore.hasBusiness)" to="/mi-negocio" class="text-fiery-red hover:text-fiery-darkred transition-colors relative group py-2 flex items-center gap-2">
           <span class="w-2 h-2 bg-fiery-red rounded-full animate-pulse"></span>
           Mi Negocio
         </RouterLink>
@@ -120,7 +120,7 @@ const goToProfile = () => {
 
               <!-- Mi Negocio: solo emprendedores y admins -->
               <RouterLink
-                v-if="authStore.isEmprendedor || authStore.isAdmin"
+                v-if="authStore.isEmprendedor || (authStore.isAdmin && authStore.hasBusiness)"
                 to="/mi-negocio"
                 @click="isUserDropdownOpen = false"
                 class="flex items-center gap-3 px-5 py-3 rounded-2xl hover:bg-slate-50 text-fiery-navy transition-all"
@@ -180,7 +180,7 @@ const goToProfile = () => {
         <RouterLink @click="isMenuOpen = false" to="/directorio" class="text-xl font-black">Directorio</RouterLink>
         <RouterLink @click="isMenuOpen = false" to="/blog" class="text-xl font-black">Blog</RouterLink>
         <RouterLink v-if="authStore.hasAdminPanel" @click="isMenuOpen = false" to="/admin" class="text-xl font-black text-fiery-red">Panel Admin</RouterLink>
-        <RouterLink v-if="authStore.isEmprendedor || authStore.isAdmin" @click="isMenuOpen = false" to="/mi-negocio" class="text-xl font-black text-fiery-red">Mi Negocio</RouterLink>
+        <RouterLink v-if="authStore.isEmprendedor || (authStore.isAdmin && authStore.hasBusiness)" @click="isMenuOpen = false" to="/mi-negocio" class="text-xl font-black text-fiery-red">Mi Negocio</RouterLink>
 
         <div v-if="authStore.isAuthenticated" class="w-full flex flex-col items-center border-t pt-6 gap-3">
           <div class="w-16 h-16 rounded-full overflow-hidden shadow-md border-4 border-slate-100 mx-auto">

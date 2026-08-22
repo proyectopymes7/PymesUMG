@@ -106,7 +106,7 @@ router.beforeEach(async (to) => {
     return authStore.isAuthenticated ? '/' : '/login'
   }
 
-  if (to.meta?.requiresEmprendedor && !(authStore.isEmprendedor || authStore.isAdmin)) {
+  if (to.meta?.requiresEmprendedor && !(authStore.isEmprendedor || (authStore.isAdmin && authStore.hasBusiness))) {
     return authStore.isAuthenticated ? '/' : '/login'
   }
 
