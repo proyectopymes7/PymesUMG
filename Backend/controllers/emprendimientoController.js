@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const { sendBusinessApproved, sendBusinessRejected, sendNewBusinessRequest, sendBusinessDeactivated, sendBusinessActivated } = require('../utils/EmailService');
 
 const isAdmin = (user) => user && (user.id_rol === 1 || user.id_rol === 2);
+const isSuperAdmin = (user) => user && user.id_rol === 1;
 const isOwner = (user, emp) => user && user.id_usuario === emp.id_usuario;
 
 const createEmprendimiento = async (req, res) => {
@@ -162,6 +163,18 @@ const updateEmprendimiento = async (req, res) => {
     }
 
     const updateData = req.body;
+    const bodyKeys = Object.keys(updateData);
+    const isStatusOnlyChange = bodyKeys.length > 0 && bodyKeys.every(key => key === 'estado');
+
+    // Un Administrador (no dueño) solo puede aprobar/rechazar/activar/desactivar,
+    // no editar los datos del negocio. Solo Super Admin o el dueño pueden editar todo.
+    if (!isStatusOnlyChange && !isSuperAdmin(req.user) && !isOwner(req.user, emprendimiento)) {
+      return res.status(403).json({
+        error: 'Access denied',
+        message: 'Only a Super Admin or the business owner can edit business details'
+      });
+    }
+
     const nuevoEstado = updateData.estado?.toLowerCase()
     const estadoActual = emprendimiento.estado?.toLowerCase()
 

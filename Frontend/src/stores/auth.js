@@ -15,7 +15,8 @@ export const useAuthStore = defineStore('auth', {
       user,
       token: localStorage.getItem('token') || null,
       loading: false,
-      error: null
+      error: null,
+      hasBusiness: false
     }
   },
 
@@ -32,6 +33,19 @@ export const useAuthStore = defineStore('auth', {
   },
 
   actions: {
+    async checkHasBusiness() {
+      if (!this.user || !(this.user.id_rol === 1 || this.user.id_rol === 2)) {
+        this.hasBusiness = false
+        return
+      }
+      try {
+        const response = await api.get('/emprendimientos/my/emprendimientos')
+        this.hasBusiness = !!(response.data?.data?.length)
+      } catch {
+        this.hasBusiness = false
+      }
+    },
+
     async loginWithEmail(identifier, password) {
       this.loading = true
       this.error = null
@@ -44,6 +58,7 @@ export const useAuthStore = defineStore('auth', {
 
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
+        await this.checkHasBusiness()
 
         return true
       } catch (err) {
@@ -66,6 +81,7 @@ export const useAuthStore = defineStore('auth', {
 
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
+        await this.checkHasBusiness()
 
         return true
       } catch (err) {
@@ -92,6 +108,7 @@ export const useAuthStore = defineStore('auth', {
 
         localStorage.setItem('token', token)
         localStorage.setItem('user', JSON.stringify(user))
+        await this.checkHasBusiness()
 
         return true
       } catch (err) {
@@ -108,6 +125,7 @@ export const useAuthStore = defineStore('auth', {
         const response = await api.get('/auth/profile')
         this.user = response.data.data
         localStorage.setItem('user', JSON.stringify(this.user))
+        await this.checkHasBusiness()
         return true
       } catch (err) {
         // Solo logout si el token expiró (401), no por errores de red o API caída
@@ -125,6 +143,7 @@ export const useAuthStore = defineStore('auth', {
     logout() {
       this.user = null
       this.token = null
+      this.hasBusiness = false
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       window.location.href = '/' // Redirigir al inicio al cerrar sesión
