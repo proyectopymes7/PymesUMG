@@ -31,7 +31,9 @@ jobs:
 
       - name: Restart backend API
         run: |
-          pm2 restart backend
+          cd /var/www/backend
+          pm2 restart backend --update-env || pm2 start server.js --name backend
+          pm2 save
 
       - name: Sync frontend
         run: |
