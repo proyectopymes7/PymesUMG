@@ -37,7 +37,7 @@ jobs:
 
       - name: Sync frontend
         run: |
-          rsync -av --delete \
+          rsync -av --delete --exclude='.env' \
           /var/www/pymes-temp/Frontend/ \
           /var/www/frontend/
 
