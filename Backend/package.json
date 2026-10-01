@@ -34,7 +34,7 @@
     "openai": "^6.39.1",
     "rate-limiter-flexible": "^4.0.1",
     "sharp": "^0.35.5",
-    "tedious": "^16.6.1",
+    "tedious": "^20.0.0",
     "uuid": "^14.0.0",
     "winston": "^3.11.0"
   },
