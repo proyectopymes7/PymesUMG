@@ -1,0 +1,27 @@
+# SCA continuo: Dependabot revisa semanalmente las dependencias y abre
+# Pull Requests con las versiones corregidas. Cada PR pasa por el
+# Security Pipeline antes de poder fusionarse.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /Backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /Frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

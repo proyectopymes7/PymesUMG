@@ -1,0 +1,8 @@
+# Control local opcional (antes incluso de hacer push):
+#   pip install pre-commit && pre-commit install
+# Bloquea el commit si contiene una credencial.
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

@@ -1,0 +1,247 @@
+# =============================================================================
+#  Security Pipeline (DevSecOps) - Directorio Web PYMES
+#
+#  Tres controles automatizados que se ejecutan en cada Pull Request y antes
+#  de cada despliegue a produccion (deploy.yml lo invoca como paso previo):
+#
+#    1. SAST    - Semgrep        -> patrones de codigo inseguro
+#    2. SCA     - npm audit       -> dependencias con vulnerabilidades conocidas
+#                 Dependency Review (solo en PRs) -> bloquea dependencias nuevas vulnerables
+#    3. Secrets - Gitleaks        -> credenciales en el codigo y en TODO el historial
+#
+#  Si alguno de los controles falla, el PR no se puede fusionar a master
+#  (regla de proteccion de rama) y el despliegue a produccion no se ejecuta.
+#  Los resultados se publican en la pestana "Security > Code scanning" (SARIF)
+#  y como artefactos descargables de cada ejecucion.
+# =============================================================================
+name: Security Pipeline
+
+on:
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+  workflow_call:
+  schedule:
+    # Lunes 06:00 UTC: re-escanea aunque no haya cambios (aparecen CVE nuevos)
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. SAST - Analisis estatico de codigo
+  # ---------------------------------------------------------------------------
+  sast:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    container:
+      image: semgrep/semgrep:1.178.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Semgrep - reporte completo (SARIF)
+        run: |
+          semgrep scan \
+            --config p/default \
+            --config p/owasp-top-ten \
+            --config p/javascript \
+            --config p/nodejs \
+            --config p/expressjs \
+            --config p/react \
+            --config p/jwt \
+            --config .semgrep/ \
+            --metrics=off \
+            --sarif-output=semgrep.sarif \
+            --json-output=semgrep.json
+
+      - name: Publicar resultados en GitHub Security
+        if: always() && hashFiles('semgrep.sarif') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Guardar reporte
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sast-semgrep-report
+          path: |
+            semgrep.sarif
+            semgrep.json
+
+      - name: Quality gate - fallar si hay hallazgos de severidad ERROR (alta)
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          results = json.load(open("semgrep.json"))["results"]
+          by_sev = {}
+          for r in results:
+              by_sev.setdefault(r["extra"]["severity"], []).append(r)
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary, "a") as s:
+              s.write("## SAST - Semgrep\n\n| Severidad | Hallazgos |\n|---|---|\n")
+              for sev in ("ERROR", "WARNING", "INFO"):
+                  s.write(f"| {sev} | {len(by_sev.get(sev, []))} |\n")
+              blocking = by_sev.get("ERROR", [])
+              if blocking:
+                  s.write("\n### Hallazgos bloqueantes\n\n| Regla | Archivo | Linea |\n|---|---|---|\n")
+                  for r in blocking:
+                      s.write(f"| `{r['check_id'].split('.')[-1]}` | `{r['path']}` | {r['start']['line']} |\n")
+          blocking = by_sev.get("ERROR", [])
+          for r in blocking:
+              print(f"::error file={r['path']},line={r['start']['line']}::[Semgrep] {r['check_id'].split('.')[-1]}: {r['extra']['message'][:300]}")
+          if blocking:
+              print(f"{len(blocking)} hallazgo(s) de severidad ERROR. Corrijalos antes de fusionar.")
+              sys.exit(1)
+          print("Sin hallazgos bloqueantes.")
+          PY
+
+  # ---------------------------------------------------------------------------
+  # 2. SCA - Analisis de composicion de software (dependencias de terceros)
+  # ---------------------------------------------------------------------------
+  sca:
+    name: SCA (npm audit - ${{ matrix.project }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [Backend, Frontend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Reporte completo de dependencias (JSON)
+        run: npm audit --json > npm-audit.json || true
+
+      - name: Resumen
+        run: |
+          node -e '
+            const r = require("./npm-audit.json");
+            const v = r.metadata.vulnerabilities;
+            let md = `## SCA - ${process.env.P}\n\n| Critical | High | Moderate | Low |\n|---|---|---|---|\n`;
+            md += `| ${v.critical} | ${v.high} | ${v.moderate} | ${v.low} |\n\n`;
+            const rows = Object.values(r.vulnerabilities || {}).filter(x => ["critical","high"].includes(x.severity));
+            if (rows.length) {
+              md += "| Paquete | Severidad | Rango vulnerable |\n|---|---|---|\n";
+              for (const x of rows) md += `| ${x.name} | ${x.severity} | ${x.range} |\n`;
+            }
+            require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, md);
+          '
+        env:
+          P: ${{ matrix.project }}
+
+      - name: Guardar reporte
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sca-npm-audit-${{ matrix.project }}
+          path: ${{ matrix.project }}/npm-audit.json
+
+      - name: Quality gate - dependencias de produccion sin vulnerabilidades HIGH/CRITICAL
+        run: npm audit --omit=dev --audit-level=high
+
+  dependency-review:
+    name: SCA (Dependency Review)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  # ---------------------------------------------------------------------------
+  # 3. Deteccion de secretos - codigo actual + historial completo de commits
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: Secrets detection (Gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # historial completo, no solo el ultimo commit
+
+      - name: Instalar Gitleaks (verificando checksum)
+        run: |
+          curl -sSfL -o gitleaks.tgz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tgz" | sha256sum -c -
+          tar -xzf gitleaks.tgz gitleaks && rm gitleaks.tgz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Escanear historial de commits
+        id: scan
+        run: |
+          echo "Commits en el historial: $(git rev-list --all --count)"
+          gitleaks git . \
+            --config .gitleaks.toml \
+            --redact \
+            --report-format sarif \
+            --report-path gitleaks.sarif \
+            --verbose
+
+      - name: Escanear archivos actuales (incluye no versionados en el checkout)
+        if: always()
+        run: |
+          gitleaks dir . \
+            --config .gitleaks.toml \
+            --redact \
+            --report-format json \
+            --report-path gitleaks-dir.json
+
+      - name: Resumen
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os
+          try:
+              runs = json.load(open("gitleaks.sarif"))["runs"]
+              res = [r for run in runs for r in run.get("results", [])]
+          except Exception:
+              res = []
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
+              s.write(f"## Secrets - Gitleaks\n\nSecretos encontrados en el historial: **{len(res)}**\n\n")
+              if res:
+                  s.write("| Regla | Archivo | Linea | Commit |\n|---|---|---|---|\n")
+                  for r in res:
+                      loc = r["locations"][0]["physicalLocation"]
+                      commit = r.get("partialFingerprints", {}).get("commitSha", "")[:7]
+                      s.write(f"| `{r['ruleId']}` | `{loc['artifactLocation']['uri']}` | {loc['region']['startLine']} | {commit} |\n")
+          PY
+
+      - name: Publicar resultados en GitHub Security
+        if: always() && hashFiles('gitleaks.sarif') != ''
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+      - name: Guardar reporte
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: secrets-gitleaks-report
+          path: |
+            gitleaks.sarif
+            gitleaks-dir.json

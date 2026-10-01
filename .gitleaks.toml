@@ -1,0 +1,16 @@
+# Configuracion de Gitleaks - Directorio Web PYMES
+# Usa las ~200 reglas por defecto (AWS, Azure, GitHub, OpenAI, JWT,
+# claves privadas, cadenas de conexion, etc.) y excluye solo artefactos
+# generados que no contienen codigo escrito por el equipo.
+title = "PYMES gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Artefactos generados"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)package-lock\.json$''',
+]

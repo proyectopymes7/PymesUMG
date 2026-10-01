@@ -1,0 +1,37 @@
+# Reglas SAST propias del Directorio Web PYMES.
+# Complementan los rulesets publicos de Semgrep con patrones especificos
+# de este proyecto (consultas SQL dinamicas con mssql).
+rules:
+  - id: pymes-dynamic-sql-column-from-object-keys
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      El nombre de columna del UPDATE se construye con claves de un objeto
+      ($OBJ) sin validarlas. Si ese objeto viene de req.body, un atacante
+      puede inyectar SQL a traves del NOMBRE del campo (no del valor).
+      Filtre las claves con una lista blanca (Set.has) o use sqlIdentifier().
+    metadata:
+      category: security
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      owasp: "A03:2021 - Injection"
+    patterns:
+      - pattern-inside: |
+          Object.keys($OBJ).forEach(($KEY, ...) => { ... })
+      - pattern: |
+          $ARR.push(`${$KEY}...`)
+      - pattern-not-inside: |
+          if (<... $ALLOWED.has($KEY) ...>) { ... }
+
+  - id: pymes-mass-assignment-from-req-body
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      Se copian TODAS las claves de req.body a un objeto que se envia al
+      modelo (asignacion masiva). Seleccione explicitamente los campos
+      permitidos.
+    metadata:
+      category: security
+      cwe: "CWE-915: Improperly Controlled Modification of Dynamically-Determined Object Attributes"
+      owasp: "A08:2021 - Software and Data Integrity Failures"
+    pattern: |
+      Object.keys(req.body).forEach(($K) => { ... $OBJ[$K] = req.body[$K]; ... })
