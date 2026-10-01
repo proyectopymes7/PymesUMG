@@ -42,3 +42,14 @@ El repositorio ejecuta tres controles de seguridad automáticos, definidos en
 pip install pre-commit
 pre-commit install   # Gitleaks revisa cada commit antes de crearse
 ```
+
+## Nota de operación del servidor
+
+- La API (`/var/www/backend/server.js`) la ejecuta el **PM2 del usuario `deploy`**
+  como servicio `pm2-deploy` (systemd), el mismo usuario del runner de GitHub Actions.
+  Así `pm2 restart backend` en `deploy.yml` reinicia el proceso real.
+  No inicie otra copia con el PM2 de `root`: ocuparía el puerto 3000 y los
+  despliegues dejarían de aplicarse.
+- El paso *Verify backend API is up* de `deploy.yml` hace fallar el despliegue si la
+  API no responde tras reiniciar.
+- `/var/www/backend/.env` debe tener permisos `600` (solo lectura del usuario `deploy`).
