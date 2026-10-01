@@ -124,11 +124,14 @@ class Valoracion {
   }
 
   static async update(id, valoracionData) {
+    // Columnas actualizables: los nombres de columna se interpolan en el SQL,
+    // por eso solo se permiten los de esta lista.
+    const ALLOWED = new Set(['nombre_display', 'comentario']);
     const setClause = [];
     const params = [{ value: id, type: sql.Int }];
 
     Object.keys(valoracionData).forEach((key, index) => {
-      if (valoracionData[key] !== undefined) {
+      if (valoracionData[key] !== undefined && ALLOWED.has(key)) {
         setClause.push(`${key} = @param${index}`);
         params.push({ value: valoracionData[key], type: sql.NVarChar });
       }

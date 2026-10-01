@@ -131,6 +131,12 @@ class User {
   }
 
   static async update(id, userData) {
+    // Columnas actualizables: los nombres de columna se interpolan en el SQL,
+    // por eso solo se permiten los de esta lista.
+    const ALLOWED = new Set([
+      'nombre', 'apellido', 'telefono', 'foto_perfil', 'activo', 'password_hash',
+      'reset_token', 'reset_token_expires', 'bloqueado_hasta', 'intentos_fallidos'
+    ]);
     const setClause = [];
     const params = [{ name: 'id_usuario', value: id, type: sql.Int }];
 
@@ -138,7 +144,7 @@ class User {
     const dateFields = ['reset_token_expires', 'bloqueado_hasta', 'fecha_registro'];
 
     Object.keys(userData).forEach((key, index) => {
-      if (userData[key] !== undefined) {
+      if (userData[key] !== undefined && ALLOWED.has(key)) {
         setClause.push(`${key} = @param${index}`);
         const value = userData[key];
         let type = sql.NVarChar;

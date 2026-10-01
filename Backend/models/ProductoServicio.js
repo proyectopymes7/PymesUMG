@@ -200,6 +200,9 @@ class ProductoServicio {
   }
 
   static async update(id, productoData) {
+    // Columnas actualizables: los nombres de columna se interpolan en el SQL,
+    // por eso solo se permiten los de esta lista.
+    const ALLOWED = new Set(['nombre', 'descripcion', 'precio', 'disponible', 'tipo', 'visibilidad_precio', 'id_emprendimiento']);
     const setClause = [];
     const params = [{ name: 'id_producto', value: id, type: sql.Int }];
 
@@ -212,7 +215,7 @@ class ProductoServicio {
 
     Object.keys(productoData).forEach((key, index) => {
       const val = productoData[key];
-      if (val !== undefined) {
+      if (val !== undefined && ALLOWED.has(key)) {
         setClause.push(`${key} = @param${index}`);
         params.push({ name: `param${index}`, value: val === '' ? null : val, type: typeFor(key) });
       }

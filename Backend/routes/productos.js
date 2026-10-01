@@ -164,13 +164,13 @@ router.post('/', auth, async (req, res) => {
 
 router.put('/:id', auth, async (req, res) => {
   try {
-    const updateData = {};
-    
-    Object.keys(req.body).forEach(key => {
-      if (req.body[key] !== undefined) {
-        updateData[key] = req.body[key];
-      }
-    });
+    // Solo se aceptan los campos editables del producto (evita asignacion
+    // masiva e inyeccion SQL a traves del nombre del campo).
+    const { nombre, descripcion, precio, disponible, tipo, visibilidad_precio } = req.body;
+    const updateData = Object.fromEntries(
+      Object.entries({ nombre, descripcion, precio, disponible, tipo, visibilidad_precio })
+        .filter(([, value]) => value !== undefined)
+    );
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({

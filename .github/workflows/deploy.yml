@@ -4,14 +4,29 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
+  # Puerta de seguridad: SAST + SCA + deteccion de secretos.
+  # Si falla, el despliegue NO se ejecuta.
+  security:
+    name: Security gate
+    uses: ./.github/workflows/security.yml
+    permissions:
+      contents: read
+      security-events: write
+      pull-requests: write
+
   deploy:
+    needs: security
     runs-on: self-hosted
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Update repository
         run: |
