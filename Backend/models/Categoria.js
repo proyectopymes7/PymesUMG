@@ -113,11 +113,14 @@ class Categoria {
   }
 
   static async update(id, categoriaData) {
+    // Columnas actualizables: los nombres de columna se interpolan en el SQL,
+    // por eso solo se permiten los de esta lista.
+    const ALLOWED = new Set(['nombre', 'descripcion', 'id_categoria_padre', 'activo']);
     const setClause = [];
     const params = [{ name: 'id_categoria', value: id, type: sql.Int }];
 
     Object.keys(categoriaData).forEach((key, index) => {
-      if (categoriaData[key] !== undefined) {
+      if (categoriaData[key] !== undefined && ALLOWED.has(key)) {
         setClause.push(`${key} = @param${index}`);
         params.push({ name: `param${index}`, value: categoriaData[key], type: key === 'activo' ? sql.Bit : sql.NVarChar });
       }

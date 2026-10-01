@@ -5,7 +5,7 @@ El repositorio ejecuta tres controles de seguridad automáticos, definidos en
 
 | Control | Herramienta | Qué revisa | Bloquea cuando |
 |---|---|---|---|
-| **SAST** | Semgrep 1.178 (rulesets `default`, `owasp-top-ten`, `javascript`, `nodejs`, `expressjs`, `react`, `jwt` + reglas propias en `.semgrep/`) | Código fuente de Backend y Frontend | Hay hallazgos de severidad `ERROR` |
+| **SAST** | Semgrep 1.178 (rulesets `default`, `owasp-top-ten`, `javascript`, `nodejs`, `expressjs`, `react`, `jwt` + reglas propias en `.semgrep/`) | Código fuente de Backend y Frontend | Hay hallazgos de severidad alta (`ERROR`, `HIGH` o `CRITICAL`) |
 | **SCA** | `npm audit` (Backend y Frontend) + Dependency Review + Dependabot | Dependencias de terceros contra la base de datos de vulnerabilidades de GitHub | Una dependencia de producción tiene vulnerabilidad `high` o `critical`; o un PR agrega una dependencia vulnerable |
 | **Secretos** | Gitleaks 8.30.1 | Archivos actuales **y todo el historial de commits** | Se encuentra cualquier credencial, token o clave |
 

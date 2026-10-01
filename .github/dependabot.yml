@@ -7,6 +7,8 @@ updates:
     directory: /Backend
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 5
     open-pull-requests-limit: 5
     groups:
       backend-minor-patch:
@@ -16,6 +18,8 @@ updates:
     directory: /Frontend
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 5
     open-pull-requests-limit: 5
     groups:
       frontend-minor-patch:
@@ -25,3 +29,5 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 5

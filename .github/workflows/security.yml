@@ -74,29 +74,31 @@ jobs:
             semgrep.sarif
             semgrep.json
 
-      - name: Quality gate - fallar si hay hallazgos de severidad ERROR (alta)
+      - name: Quality gate - fallar si hay hallazgos de severidad alta (ERROR/HIGH/CRITICAL)
         run: |
           python3 - <<'PY'
           import json, os, sys
+          BLOCKING = ("CRITICAL", "ERROR", "HIGH")
           results = json.load(open("semgrep.json"))["results"]
           by_sev = {}
           for r in results:
               by_sev.setdefault(r["extra"]["severity"], []).append(r)
+          blocking = [r for sev in BLOCKING for r in by_sev.get(sev, [])]
           summary = os.environ["GITHUB_STEP_SUMMARY"]
           with open(summary, "a") as s:
               s.write("## SAST - Semgrep\n\n| Severidad | Hallazgos |\n|---|---|\n")
-              for sev in ("ERROR", "WARNING", "INFO"):
-                  s.write(f"| {sev} | {len(by_sev.get(sev, []))} |\n")
-              blocking = by_sev.get("ERROR", [])
+              for sev in sorted(by_sev, key=lambda x: (x not in BLOCKING, x)):
+                  s.write(f"| {sev}{' (bloqueante)' if sev in BLOCKING else ''} | {len(by_sev[sev])} |\n")
+              if not by_sev:
+                  s.write("| - | 0 |\n")
               if blocking:
                   s.write("\n### Hallazgos bloqueantes\n\n| Regla | Archivo | Linea |\n|---|---|---|\n")
                   for r in blocking:
                       s.write(f"| `{r['check_id'].split('.')[-1]}` | `{r['path']}` | {r['start']['line']} |\n")
-          blocking = by_sev.get("ERROR", [])
           for r in blocking:
               print(f"::error file={r['path']},line={r['start']['line']}::[Semgrep] {r['check_id'].split('.')[-1]}: {r['extra']['message'][:300]}")
           if blocking:
-              print(f"{len(blocking)} hallazgo(s) de severidad ERROR. Corrijalos antes de fusionar.")
+              print(f"{len(blocking)} hallazgo(s) de severidad alta. Corrijalos antes de fusionar.")
               sys.exit(1)
           print("Sin hallazgos bloqueantes.")
           PY

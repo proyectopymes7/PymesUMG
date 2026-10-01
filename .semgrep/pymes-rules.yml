@@ -9,7 +9,7 @@ rules:
       El nombre de columna del UPDATE se construye con claves de un objeto
       ($OBJ) sin validarlas. Si ese objeto viene de req.body, un atacante
       puede inyectar SQL a traves del NOMBRE del campo (no del valor).
-      Filtre las claves con una lista blanca (Set.has) o use sqlIdentifier().
+      Filtre las claves con una lista blanca de columnas (Set.has).
     metadata:
       category: security
       cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
