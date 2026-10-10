@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
+import ChatWidget from '../components/chat/ChatWidget.vue'
 import { getBusinessById, getBusinessProducts, getBusinessReviews, createReview, deleteReview, getProductImages } from '../services/businessService'
 import { useAuthStore } from '../stores/auth'
 
@@ -577,6 +578,17 @@ const submitReview = async () => {
       </div>
     </transition>
 
+    <ChatWidget
+      v-if="business"
+      mode="negocio"
+      :business-id="business.id"
+      :title="business.name"
+      :avatar="business.logo"
+      subtitle="Asistente virtual del negocio"
+      :greeting="`Hola, soy el asistente de ${business.name}. Pregúntame por productos, precios, horario o cómo llegar.`"
+      button-label="Pregúntale al negocio"
+      :suggestions="['¿Qué productos tienen?', '¿Están abiertos ahora?', '¿Qué dicen los clientes?']"
+    />
   </div>
 </template>
 

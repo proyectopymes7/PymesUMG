@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Navbar from '../components/layout/Navbar.vue'
 import LocationPicker from '../components/shared/LocationPicker.vue'
 import ImageSuggestModal from '../components/shared/ImageSuggestModal.vue'
+import ChatWidget from '../components/chat/ChatWidget.vue'
 import { useAuthStore } from '../stores/auth'
 import { getMyBusinesses, getRawCategories, updateBusinessData, uploadImage, uploadProductImage, getProductImages } from '../services/businessService'
 import api from '../services/api'
@@ -926,6 +927,17 @@ const saveGeneral = async () => {
     </transition>
 
   </div>
+
+  <ChatWidget
+    v-if="business"
+    mode="coach"
+    :business-id="business.id"
+    title="Coach PYME"
+    :subtitle="`Asesor de ${business.name}`"
+    :greeting="`Hola ${authStore.userName}. Conozco las estadísticas, el catálogo y las reseñas de ${business.name}. ¿En qué te ayudo a mejorar?`"
+    button-label="Coach PYME"
+    :suggestions="['¿Cómo va mi negocio?', '¿Qué mejoro primero en mi perfil?', 'Mejora mi descripción', 'Ayúdame a responder mis reseñas']"
+  />
 
   <!-- Modales de sugerencias IA -->
   <ImageSuggestModal
