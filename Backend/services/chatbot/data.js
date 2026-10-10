@@ -103,7 +103,7 @@ async function searchBusinesses({ texto, categoria, limite = 6 }) {
   if (texto) {
     const t = addTermParams(texto, 't', params);
     if (t.length) where += `
-      AND (${anyLike(['e.nombre', 'e.descripcion', 'c.nombre'], t)}
+      AND (${anyLike(['e.nombre', 'e.descripcion', 'c.nombre', 'e.municipio', 'e.localidad', 'e.direccion', 'e.departamento'], t)}
         OR EXISTS (SELECT 1 FROM ProductosServicios p
                    WHERE p.id_emprendimiento = e.id_emprendimiento
                      AND ${anyLike(['p.nombre', 'p.descripcion'], t)})
