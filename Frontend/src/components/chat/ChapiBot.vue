@@ -69,9 +69,11 @@ const lookStyle = computed(() => ({ '--lx': `${props.look?.x || 0}px`, '--ly': `
     <g class="posture">
       <g class="float">
         <!-- Capa de superhéroe -->
-        <g v-if="variant === 'full' && hero" class="cape">
-          <path d="M31 66 Q19 86 13 107 Q50 99 87 107 Q81 86 69 66 Z" fill="#780000" />
-          <path d="M13 107 Q50 99 87 107" fill="none" stroke="#F2B33D" stroke-width="1.6" />
+        <g v-if="variant === 'full' && hero" class="cape-wind">
+          <g class="cape">
+            <path d="M31 66 Q19 86 13 107 Q50 99 87 107 Q81 86 69 66 Z" fill="#780000" />
+            <path d="M13 107 Q50 99 87 107" fill="none" stroke="#F2B33D" stroke-width="1.6" />
+          </g>
         </g>
 
         <!-- Brazo izquierdo -->
@@ -133,10 +135,12 @@ const lookStyle = computed(() => ({ '--lx': `${props.look?.x || 0}px`, '--ly': `
             <rect x="20" y="26.6" width="60" height="1" fill="#669BBC" />
             <rect x="20" y="57" width="60" height="6" fill="#f0dcb4" />
           </g>
-          <g class="tassel">
-            <line x1="25" y1="27" x2="21" y2="35" stroke="#780000" stroke-width="1.4" />
-            <circle cx="20.5" cy="36.5" r="2.6" fill="#C1121F" />
-            <circle cx="24" cy="38.5" r="2.1" fill="#F2B33D" />
+          <g class="tassel-wind">
+            <g class="tassel">
+              <line x1="25" y1="27" x2="21" y2="35" stroke="#780000" stroke-width="1.4" />
+              <circle cx="20.5" cy="36.5" r="2.6" fill="#C1121F" />
+              <circle cx="24" cy="38.5" r="2.1" fill="#F2B33D" />
+            </g>
           </g>
 
           <!-- Gorro navideño o gorrito de dormir -->
@@ -457,6 +461,10 @@ const lookStyle = computed(() => ({ '--lx': `${props.look?.x || 0}px`, '--ly': `
 .fx-ja text, .fx-notes text { animation: floatUp 1.2s ease-out infinite both; }
 .fx-ja text:nth-child(2), .fx-notes text:nth-child(2) { animation-delay: 0.5s; }
 .fx-bang { transform-origin: center; animation: bang 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* ── Viento de las escenas: la capa y las borlas se van hacia atrás ── */
+.cape-wind { transform-box: view-box; transform-origin: 50px 66px; transform: rotate(var(--wind, 0deg)); }
+.tassel-wind { transform-box: view-box; transform-origin: 25px 27px; transform: rotate(calc(var(--wind, 0deg) * 0.8)); }
 
 /* ── Mirada que sigue el cursor ─────────────── */
 .eye-look { transform: translate(var(--lx, 0px), var(--ly, 0px)); transition: transform 0.18s ease-out; }

@@ -3,6 +3,7 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
 import { sendChatMessage, trackChatClick } from '../../services/chatService'
 import ChapiBot from './ChapiBot.vue'
+import { swingScene, kiteScene, volcanoScene, lateScene } from './chapiScenes'
 
 const props = defineProps({
   // 'directorio' | 'negocio' | 'coach'
@@ -135,27 +136,23 @@ const statusText = computed(() => STATUS_TEXT[botState.value] || props.subtitle)
 const canSend = computed(() => input.value.trim().length > 0 && !loading.value)
 const storageKey = computed(() => `chat:${props.mode}:${props.businessId ?? 'general'}`)
 
-// ── Entrada: Chapi llega tarde con su maletín y se mete a la bolita ──
+// ── Entrada animada: Chapi llega a la bolita con una escena ──
 const INTRO_KEY = 'chapi-intro'
-const RUNNER = { w: 58, h: 72 }
 const launcherAvatar = ref(null)
-const runner = ref(null)
-const introPhase = ref('done')   // waiting | arriving | landed | done
+const introPhase = ref('done')   // waiting | scene | landed | done
 const typed = ref('')
 const typingCaret = ref(false)
-const runnerStyle = ref({})
-let introAnim = null
 let introTimers = []
 let introCancelled = false
-let kiteAnim = null
-let sparkEls = []
+let sceneEls = []
 const introHeadState = ref('idle')
 const rumbling = ref(false)
-const kiteVisible = ref(false)
-const kiteHoldsChapi = ref(true)
-const kiteStyle = ref({})
-const flyerState = ref('happy')
-const flyerHero = ref(false)
+const masked = ref(false)
+const unmasking = ref(false)
+
+// Chapi actor: el dibujo que mueven las escenas cuadro por cuadro
+const actor = ref({ on: false, state: 'idle', hero: false, carry: false })
+const actorEl = ref(null)
 
 const linesFor = (style) => {
   const lines = props.introLines
@@ -170,12 +167,11 @@ const wait = (ms) => new Promise(resolve => introTimers.push(setTimeout(resolve,
 
 const stopIntro = () => {
   introCancelled = true
-  introAnim?.cancel()
-  kiteAnim?.cancel()
   introTimers.forEach(clearTimeout)
   introTimers = []
-  sparkEls.forEach(el => el.remove())
-  sparkEls = []
+  sceneEls.forEach(el => el.remove())
+  sceneEls = []
+  actor.value.on = false
 }
 
 const finishIntro = () => {
@@ -183,7 +179,6 @@ const finishIntro = () => {
   masked.value = false
   unmasking.value = false
   rumbling.value = false
-  kiteVisible.value = false
   introHeadState.value = 'idle'
   introPhase.value = 'done'
   typed.value = linesFor('default').at(-1) || ''
@@ -206,42 +201,6 @@ const eraseText = async (speed = 14) => {
   }
 }
 
-// Recorrido: sale de debajo del borde, avanza a saltitos y se lanza dentro de la bolita
-const buildRunPath = (distance) => {
-  const frames = []
-  const up = 'cubic-bezier(0.2, 0.7, 0.4, 1)'
-  const down = 'cubic-bezier(0.6, 0, 0.8, 0.4)'
-  const at = (offset, x, y, { scale = 1, opacity = 1, easing = 'linear' } = {}) =>
-    frames.push({ offset, transform: `translate(${x}px, ${y}px) scale(${scale})`, opacity, easing })
-
-  at(0, -distance, 110, { easing: up })
-  at(0.13, -distance + 14, -52, { easing: down })
-  at(0.22, -distance + 28, 0, { easing: up })
-  const hops = 3
-  const from = -distance + 28
-  const step = (-62 - from) / hops
-  for (let i = 0; i < hops; i++) {
-    const t = 0.22 + i * 0.17
-    at(t + 0.085, from + step * (i + 0.5), -20, { easing: down })
-    at(t + 0.17, from + step * (i + 1), 0, { easing: up })
-  }
-  at(0.87, -34, -62, { scale: 0.9, easing: down })
-  at(1, 0, 0, { scale: 0.3, opacity: 0 })
-  return frames
-}
-
-// Entrada de superhéroe: baja columpiándose de un hilo de colores, se suelta y cae en la bolita
-const SWINGER = { w: 58, h: 72, handX: 52, handY: 24 }
-const pendulum = ref(null)
-const swinger = ref(null)
-const rope = ref(null)
-const flyer = ref(null)
-const pendulumStyle = ref({})
-const swingerStyle = ref({})
-const flyerStyle = ref({})
-const masked = ref(false)
-const unmasking = ref(false)
-
 // Cada sesión nueva muestra la siguiente entrada. Con ?chapi=barrilete|volcan|heroe|tarde se fuerza una.
 const INTRO_STYLES = ['kite', 'volcano', 'swing', 'late']
 const INTRO_ALIASES = { barrilete: 'kite', volcan: 'volcano', 'volcán': 'volcano', heroe: 'swing', 'héroe': 'swing', tarde: 'late' }
@@ -255,196 +214,28 @@ const pickIntroStyle = () => {
   return INTRO_STYLES[turn % INTRO_STYLES.length]
 }
 
-const arriveLate = async (cx, cy) => {
-  const distance = Math.min(320, cx - 30)
-  runnerStyle.value = {
-    left: `${cx - RUNNER.w / 2}px`,
-    top: `${cy - RUNNER.h / 2 - 4}px`,
-    width: `${RUNNER.w}px`,
-    height: `${RUNNER.h}px`,
-    transform: `translate(${-distance}px, 110px)`
-  }
-  introPhase.value = 'arriving'
+// Ejecuta una escena de chapiScenes.js con el actor y la bolita
+const playScene = async (scene, cx, cy) => {
+  actor.value = { on: true, state: 'idle', hero: false, carry: false }
+  introPhase.value = 'scene'
   await nextTick()
-  if (!runner.value) return false
-  introAnim = runner.value.animate(buildRunPath(distance), { duration: 2700, fill: 'forwards' })
-  try { await introAnim.finished } catch { return false }
-  return !introCancelled
-}
-
-const arriveSwinging = async (cx, cy) => {
-  const anchorY = -40
-  const length = Math.max(240, cy - 70 - anchorY)
-  const swing = 'cubic-bezier(0.45, 0, 0.55, 1)'
-  pendulumStyle.value = { left: `${cx - 150}px`, top: `${anchorY}px`, height: `${length}px`, transform: 'rotate(95deg)' }
-  swingerStyle.value = {
-    width: `${SWINGER.w}px`,
-    height: `${SWINGER.h}px`,
-    left: `${-SWINGER.handX}px`,
-    top: `${length - SWINGER.handY}px`
-  }
-  introPhase.value = 'swinging'
-  await nextTick()
-  if (!pendulum.value) return false
-  introAnim = pendulum.value.animate([
-    { transform: 'rotate(95deg)', easing: swing },
-    { transform: 'rotate(-14deg)', offset: 0.55, easing: swing },
-    { transform: 'rotate(9deg)', offset: 0.8, easing: swing },
-    { transform: 'rotate(-8deg)' }
-  ], { duration: 2800, fill: 'forwards' })
-  try { await introAnim.finished } catch { return false }
-  if (introCancelled || !swinger.value) return false
-
-  // Se suelta: el hilo se recoge y Chapi da una voltereta hacia la bolita
-  const r = swinger.value.getBoundingClientRect()
-  flyerStyle.value = { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` }
-  flyerState.value = 'happy'
-  flyerHero.value = true
-  introPhase.value = 'flying'
-  await nextTick()
-  rope.value?.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(0)' }], { duration: 380, easing: 'ease-in', fill: 'forwards' })
-  if (!flyer.value) return false
-  const dx = cx - (r.left + r.width / 2)
-  const dy = cy - (r.top + r.height / 2)
-  introAnim = flyer.value.animate([
-    { transform: 'translate(0, 0) rotate(0deg) scale(1)', easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)' },
-    { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - 55}px) rotate(200deg) scale(0.9)`, offset: 0.5, easing: 'cubic-bezier(0.6, 0, 0.8, 0.4)' },
-    { transform: `translate(${dx}px, ${dy}px) rotate(360deg) scale(0.3)`, opacity: 0 }
-  ], { duration: 850, fill: 'forwards' })
-  try { await introAnim.finished } catch { return false }
-  return !introCancelled
-}
-
-// Barrilete: baja planeando agarrado de un barrilete gigante, se suelta y el barrilete se va volando
-const KITE = { w: 120, h: 175, chapiX: 37, chapiY: 132 }
-const kiteRig = ref(null)
-const kiteChapi = ref(null)
-const KITE_COLORS = ['#C1121F', '#669BBC', '#F2B33D', '#003049']
-const KITE_WEDGES = Array.from({ length: 8 }, (_, i) => {
-  const point = (deg) => {
-    const rad = (deg - 90) * Math.PI / 180
-    return `${(50 + 40 * Math.cos(rad)).toFixed(2)} ${(50 + 40 * Math.sin(rad)).toFixed(2)}`
-  }
-  return { d: `M50 50 L${point(i * 45)} A40 40 0 0 1 ${point((i + 1) * 45)} Z`, fill: KITE_COLORS[i % 4] }
-})
-
-const arriveKite = async (cx, cy) => {
-  const left = cx - KITE.chapiX
-  const top = cy - 58 - KITE.chapiY
-  kiteStyle.value = { left: `${left}px`, top: `${top}px`, width: `${KITE.w}px`, height: `${KITE.h}px` }
-  const startY = -(top + KITE.h + 20)
-  const keepInside = (dx) => Math.max(dx, -(left - 12))
-  const ease = 'cubic-bezier(0.45, 0, 0.55, 1)'
-  kiteHoldsChapi.value = true
-  kiteVisible.value = true
-  introPhase.value = 'kite'
-  await nextTick()
-  if (!kiteRig.value) return false
-  introAnim = kiteRig.value.animate([
-    { transform: `translate(${keepInside(-240)}px, ${startY}px) rotate(-10deg)`, easing: ease },
-    { transform: `translate(${keepInside(-90)}px, ${startY * 0.62}px) rotate(9deg)`, offset: 0.3, easing: ease },
-    { transform: `translate(${keepInside(-200)}px, ${startY * 0.3}px) rotate(-8deg)`, offset: 0.6, easing: ease },
-    { transform: `translate(${keepInside(-50)}px, -40px) rotate(6deg)`, offset: 0.85, easing: ease },
-    { transform: 'translate(0px, 0px) rotate(0deg)' }
-  ], { duration: 3400, fill: 'forwards' })
-  try { await introAnim.finished } catch { return false }
-  if (introCancelled || !kiteChapi.value) return false
-
-  // Chapi se suelta y cae en la bolita
-  const r = kiteChapi.value.getBoundingClientRect()
-  flyerStyle.value = { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` }
-  flyerState.value = 'happy'
-  flyerHero.value = false
-  kiteHoldsChapi.value = false
-  introPhase.value = 'dropping'
-  await nextTick()
-
-  // El barrilete se queda flotando un momento y luego se va volando
-  kiteAnim = kiteRig.value?.animate([
-    { transform: 'translate(0px, 0px) rotate(0deg)', easing: ease },
-    { transform: 'translate(8px, -28px) rotate(-6deg)', offset: 0.3, easing: ease },
-    { transform: 'translate(-6px, -16px) rotate(5deg)', offset: 0.55, easing: 'cubic-bezier(0.5, 0, 0.9, 0.5)' },
-    { transform: `translate(240px, ${-(top + KITE.h + 80)}px) rotate(25deg)`, opacity: 0 }
-  ], { duration: 2800, fill: 'forwards' })
-  if (kiteAnim) kiteAnim.onfinish = () => { kiteVisible.value = false }
-
-  if (!flyer.value) return false
-  const dx = cx - (r.left + r.width / 2)
-  const dy = cy - (r.top + r.height / 2)
-  introAnim = flyer.value.animate([
-    { transform: 'translate(0px, 0px) scale(1)', easing: 'cubic-bezier(0.5, 0, 0.8, 0.4)' },
-    { transform: `translate(${dx}px, ${dy}px) scale(0.3)`, opacity: 0 }
-  ], { duration: 560, fill: 'forwards' })
-  try { await introAnim.finished } catch { return false }
-  return !introCancelled
-}
-
-// Chispas y humo que salen de la bolita (elementos sueltos que se borran solos)
-const burst = (cx, cy) => {
-  const colors = ['#C1121F', '#F2B33D', '#ff7a1a', '#FDF0D5', '#780000']
-  const add = (style, frames, options) => {
-    const el = document.createElement('span')
-    Object.assign(el.style, { position: 'fixed', borderRadius: '50%', zIndex: '202', pointerEvents: 'none' }, style)
-    document.body.appendChild(el)
-    sparkEls.push(el)
-    const anim = el.animate(frames, options)
-    anim.onfinish = anim.oncancel = () => { el.remove(); sparkEls = sparkEls.filter(x => x !== el) }
-  }
-  for (let i = 0; i < 22; i++) {
-    const size = 4 + Math.random() * 5
-    const angle = (-90 + (Math.random() - 0.5) * 160) * Math.PI / 180
-    const dist = 60 + Math.random() * 120
-    const x = Math.cos(angle) * dist
-    const y = Math.sin(angle) * dist
-    add(
-      { left: `${cx - size / 2}px`, top: `${cy - size / 2}px`, width: `${size}px`, height: `${size}px`,
-        background: colors[i % colors.length], boxShadow: '0 0 8px rgb(255 122 26 / 0.7)' },
-      [
-        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-        { transform: `translate(${x * 0.7}px, ${y * 0.75}px) scale(1)`, opacity: 1, offset: 0.5 },
-        { transform: `translate(${x}px, ${y + 55}px) scale(0.4)`, opacity: 0 }
-      ],
-      { duration: 800 + Math.random() * 600, delay: Math.random() * 150, easing: 'cubic-bezier(0.2, 0.6, 0.4, 1)', fill: 'backwards' }
-    )
-  }
-  for (let i = 0; i < 5; i++) {
-    const size = 16 + Math.random() * 14
-    const x = (Math.random() - 0.5) * 50
-    add(
-      { left: `${cx - size / 2}px`, top: `${cy - size / 2}px`, width: `${size}px`, height: `${size}px`, background: 'rgb(110 110 120 / 0.45)', filter: 'blur(2px)' },
-      [
-        { transform: 'translate(0, 0) scale(0.4)', opacity: 0.9 },
-        { transform: `translate(${x}px, ${-70 - Math.random() * 50}px) scale(1.6)`, opacity: 0 }
-      ],
-      { duration: 1400 + Math.random() * 600, delay: 100 + i * 90, easing: 'ease-out', fill: 'backwards' }
-    )
-  }
-}
-
-// Volcán: la bolita tiembla, hace erupción y Chapi sale disparado girando antes de caer de vuelta
-const arriveVolcano = async (cx, cy) => {
-  introPhase.value = 'rumbling'
-  rumbling.value = true
-  await wait(1100)
-  if (introCancelled) return false
+  if (!actorEl.value) return false
+  let ok = false
+  try {
+    ok = await scene({
+      actor: actorEl.value,
+      cx,
+      cy,
+      cancelled: () => introCancelled,
+      track: (el) => sceneEls.push(el),
+      setActor: (patch) => Object.assign(actor.value, patch),
+      setRumble: (on) => { rumbling.value = on },
+      land: () => bounceLauncher()
+    })
+  } catch { ok = false }
+  actor.value.on = false
   rumbling.value = false
-
-  flyerStyle.value = { left: `${cx - SWINGER.w / 2}px`, top: `${cy - SWINGER.h / 2}px`, width: `${SWINGER.w}px`, height: `${SWINGER.h}px` }
-  flyerState.value = 'surprised'
-  flyerHero.value = false
-  introPhase.value = 'erupting'
-  await nextTick()
-  burst(cx, cy)
-  if (!flyer.value) return false
-  const rise = Math.min(280, cy - 80)
-  introAnim = flyer.value.animate([
-    { transform: 'translateY(0px) rotate(0deg) scale(0.3)', opacity: 0, easing: 'cubic-bezier(0.15, 0.8, 0.3, 1)' },
-    { transform: `translateY(${-rise}px) rotate(540deg) scale(1)`, opacity: 1, offset: 0.42, easing: 'ease-in-out' },
-    { transform: `translateY(${-rise + 14}px) rotate(680deg) scale(1)`, opacity: 1, offset: 0.55, easing: 'cubic-bezier(0.55, 0, 0.85, 0.35)' },
-    { transform: 'translateY(0px) rotate(1080deg) scale(0.3)', opacity: 0 }
-  ], { duration: 2000, fill: 'forwards' })
-  try { await introAnim.finished } catch { return false }
-  return !introCancelled
+  return ok && !introCancelled
 }
 
 const runIntro = async () => {
@@ -460,8 +251,8 @@ const runIntro = async () => {
   const cx = rect.left + rect.width / 2
   const cy = rect.top + rect.height / 2
   const style = pickIntroStyle()
-  const arrive = { swing: arriveSwinging, kite: arriveKite, volcano: arriveVolcano, late: arriveLate }[style]
-  const arrived = await arrive(cx, cy)
+  const scene = { swing: swingScene, kite: kiteScene, volcano: volcanoScene, late: lateScene }[style]
+  const arrived = await playScene(scene, cx, cy)
   if (introCancelled) return
   if (!arrived) return finishIntro()
 
@@ -670,6 +461,40 @@ const accessory = computed(() => {
   if (hour >= 6 && hour < 10) return THEMES.manana
   return {}
 })
+
+// ── Cielo del encabezado según la hora (o ?chapi-cielo=amanecer|dia|atardecer|noche) ──
+const SKIES = {
+  amanecer: ['#f4a76b', '#b8607a', '#003049'],
+  dia: ['#8fd3ff', '#56aee6', '#2f86c4'],
+  atardecer: ['#f08a4b', '#8e3f6c', '#003049'],
+  noche: ['#020d18', '#012036', '#003049']
+}
+const sky = computed(() => {
+  const params = new URLSearchParams(window.location.search)
+  const forced = params.get('chapi-cielo')?.toLowerCase()
+  if (forced && SKIES[forced]) return forced
+  if (params.get('chapi-tema') === 'noche') return 'noche'
+  const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Guatemala', hour: 'numeric', hourCycle: 'h23' }).format(new Date()))
+  if (hour >= 5 && hour < 7) return 'amanecer'
+  if (hour >= 7 && hour < 17) return 'dia'
+  if (hour >= 17 && hour < 19) return 'atardecer'
+  return 'noche'
+})
+const skyStyle = computed(() => {
+  const [top, mid, bottom] = SKIES[sky.value]
+  return { background: `linear-gradient(180deg, ${top} 0%, ${mid} 52%, ${bottom} 100%)` }
+})
+// Colores del paisaje: de día el pueblo y los cerros se ven con su color; el resto, en silueta
+const LANDS = {
+  dia: { volcano: '#7ea9c9', volcanoOp: 0.95, hills: '#4f8f5c', hillsOp: 1, town: '#f6ecdb', roof: '#b5482f', church: '#fbf4e8', legible: 0.38, clouds: 0.85 },
+  amanecer: { volcano: '#2a5b7c', volcanoOp: 0.55, hills: '#0f3a57', hillsOp: 0.85, town: '#0a2c44', roof: '#4a1d1a', church: '#0a2c44', legible: 0.6, clouds: 0.24 },
+  atardecer: { volcano: '#2a5b7c', volcanoOp: 0.55, hills: '#0f3a57', hillsOp: 0.85, town: '#0a2c44', roof: '#4a1d1a', church: '#0a2c44', legible: 0.6, clouds: 0.24 },
+  noche: { volcano: '#2a5b7c', volcanoOp: 0.55, hills: '#0f3a57', hillsOp: 0.85, town: '#0a2c44', roof: '#4a1d1a', church: '#0a2c44', legible: 0.6, clouds: 0.07 }
+}
+const land = computed(() => LANDS[sky.value])
+
+const STARS = [[18, 14, 1.1], [52, 30, 0.8], [96, 10, 1.2], [140, 26, 0.9], [176, 8, 1], [212, 34, 0.8], [282, 14, 1.2], [318, 32, 0.9], [366, 12, 1.1], [394, 40, 0.8], [124, 44, 0.7], [248, 50, 0.8]]
+const cloudPath = 'M0 22 a13 13 0 0 1 20 -11 a17 17 0 0 1 32 3 a12 12 0 0 1 6 23 h-52 a9 9 0 0 1 -6 -15z'
 
 // ── Transición de Chapi entre la bolita y el encabezado ────
 const transit = ref({ on: false, style: {}, state: 'happy' })
@@ -951,47 +776,9 @@ const format = (text) => escapeHtml(text || '')
       </div>
     </Transition>
 
-    <!-- Chapi llegando tarde (solo durante la entrada) -->
-    <div v-if="introPhase === 'arriving'" ref="runner" class="fixed z-[201] pointer-events-none"
-      :style="runnerStyle" aria-hidden="true">
-      <ChapiBot state="running" carry />
-    </div>
-
-    <!-- Chapi columpiándose de un hilo de colores -->
-    <div v-if="introPhase === 'swinging' || introPhase === 'flying'" ref="pendulum"
-      class="pendulum fixed z-[201] w-0 pointer-events-none" :style="pendulumStyle" aria-hidden="true">
-      <div ref="rope" class="rope absolute -left-[1.5px] top-0 w-[3px] h-full"></div>
-      <div v-show="introPhase === 'swinging'" ref="swinger" class="absolute" :style="swingerStyle">
-        <ChapiBot state="swinging" hero />
-      </div>
-    </div>
-    <div v-if="['flying', 'dropping', 'erupting'].includes(introPhase)" ref="flyer" class="fixed z-[201] pointer-events-none"
-      :style="flyerStyle" aria-hidden="true">
-      <ChapiBot :state="flyerState" :hero="flyerHero" />
-    </div>
-
-    <!-- Barrilete gigante del que cuelga Chapi -->
-    <div v-if="kiteVisible" ref="kiteRig" class="kite-rig fixed z-[201] pointer-events-none" :style="kiteStyle" aria-hidden="true">
-      <svg class="kite absolute left-[15px] top-0 w-[90px] h-[90px] overflow-visible" viewBox="0 0 100 100">
-        <g class="kite-tail" fill="none" stroke-width="3" stroke-linecap="round">
-          <path d="M22 80 q-12 16 0 30 t-6 32" stroke="#C1121F" />
-          <path d="M28 86 q-8 14 4 26 t-2 28" stroke="#669BBC" />
-        </g>
-        <circle cx="50" cy="50" r="46" fill="none" stroke="#C1121F" stroke-width="8" stroke-dasharray="5 7" />
-        <circle cx="50" cy="50" r="46" fill="none" stroke="#F2B33D" stroke-width="8" stroke-dasharray="4 8" stroke-dashoffset="6" />
-        <circle cx="50" cy="50" r="46" fill="none" stroke="#669BBC" stroke-width="8" stroke-dasharray="3 9" stroke-dashoffset="11" />
-        <path v-for="(w, k) in KITE_WEDGES" :key="k" :d="w.d" :fill="w.fill" />
-        <circle cx="50" cy="50" r="40" fill="none" stroke="#FDF0D5" stroke-width="1.6" />
-        <circle cx="50" cy="50" r="25" fill="none" stroke="#FDF0D5" stroke-width="5" stroke-dasharray="3 3" />
-        <circle cx="50" cy="50" r="14" fill="#780000" />
-        <rect x="44" y="44" width="12" height="12" fill="#FDF0D5" />
-        <rect x="44" y="44" width="12" height="12" fill="#FDF0D5" transform="rotate(45 50 50)" />
-        <circle cx="50" cy="50" r="3.5" fill="#C1121F" />
-      </svg>
-      <div v-show="kiteHoldsChapi" class="kite-string absolute left-[59px] top-[86px] w-[1.6px] h-[36px]"></div>
-      <div v-show="kiteHoldsChapi" ref="kiteChapi" class="absolute left-[8px] top-[96px] w-[58px] h-[72px]">
-        <ChapiBot state="swinging" />
-      </div>
+    <!-- Chapi durante las escenas de entrada -->
+    <div v-if="actor.on" ref="actorEl" class="chapi-actor" aria-hidden="true">
+      <ChapiBot :state="actor.state" :hero="actor.hero" :carry="actor.carry" :accessory="accessory" />
     </div>
 
     <!-- Chapi saltando entre la bolita y el encabezado del chat -->
@@ -1025,8 +812,62 @@ const format = (text) => escapeHtml(text || '')
         class="panel fixed z-[200] inset-0 sm:inset-auto sm:right-6 sm:bottom-6 sm:w-[408px] sm:h-[min(660px,calc(100dvh-3rem))] flex flex-col bg-fiery-navy sm:rounded-[28px] overflow-hidden">
 
         <!-- Encabezado -->
-        <header class="header relative text-white px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[14px]">
-          <div class="flex items-end gap-3">
+        <header class="header relative overflow-hidden text-white px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-[14px]" :style="skyStyle">
+          <!-- Paisaje: cielo según la hora, volcanes, cerros y un pueblo en silueta -->
+          <svg class="sky absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 408 110" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+            <defs>
+              <linearGradient id="sky-legible" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0" stop-color="#003049" :stop-opacity="land.legible" /><stop offset="0.62" stop-color="#003049" stop-opacity="0" />
+              </linearGradient>
+              <radialGradient id="sky-glow" cx="0.62" cy="0.3" r="0.5">
+                <stop offset="0" stop-color="#FDF0D5" stop-opacity="0.35" /><stop offset="1" stop-color="#FDF0D5" stop-opacity="0" />
+              </radialGradient>
+            </defs>
+            <rect class="sky-breath" width="408" height="110" fill="url(#sky-glow)" />
+            <g v-if="sky === 'noche'" fill="#FDF0D5">
+              <circle v-for="(st, n) in STARS" :key="n" class="sky-star" :cx="st[0]" :cy="st[1]" :r="st[2]" :style="{ animationDelay: `${(n * 0.37) % 2.4}s` }" />
+            </g>
+            <path v-if="sky === 'noche'" d="M252 12 a11 11 0 1 0 11 16 a8.5 8.5 0 1 1 -11 -16z" fill="#FDF0D5" />
+            <g v-else-if="sky === 'dia'">
+              <circle class="sky-sun" cx="252" cy="24" r="26" fill="#FFE27A" opacity="0.3" />
+              <circle cx="252" cy="24" r="12" fill="#FFD84D" />
+              <g class="sky-birds" fill="none" stroke="#1d4f73" stroke-width="1.3" stroke-linecap="round" opacity="0.7">
+                <path d="M150 20 q3 -3 6 0 q3 -3 6 0" /><path d="M166 30 q2.4 -2.4 4.8 0 q2.4 -2.4 4.8 0" />
+              </g>
+            </g>
+            <g v-else>
+              <circle cx="246" cy="80" r="30" fill="#F2B33D" opacity="0.25" /><circle cx="246" cy="80" r="17" fill="#F2B33D" opacity="0.95" />
+            </g>
+            <g fill="#ffffff" :opacity="land.clouds">
+              <path class="sky-cloud" :d="cloudPath" style="animation-delay: -10s" transform="translate(0 14) scale(0.7)" />
+              <path class="sky-cloud" :d="cloudPath" style="animation-delay: -42s; animation-duration: 95s" transform="translate(0 40) scale(0.5)" />
+            </g>
+            <path d="M150 110 L222 50 Q229 45 236 50 L312 110Z" :fill="land.volcano" :opacity="land.volcanoOp" />
+            <path d="M252 110 L318 62 Q324 58 330 62 L408 102 V110Z" :fill="land.volcano" :opacity="land.volcanoOp * 0.85" />
+            <g fill="#c9c4cc" opacity="0.5">
+              <circle class="sky-smoke" cx="229" cy="45" r="3" /><circle class="sky-smoke" cx="229" cy="45" r="2.4" style="animation-delay: 1.6s" />
+            </g>
+            <path d="M0 110 V93 Q60 82 120 91 T240 87 T408 85 V110Z" :fill="land.hills" :opacity="land.hillsOp" />
+            <g :fill="land.town">
+              <rect x="236" y="95" width="24" height="15" /><path d="M233 95 L248 86 L263 95Z" :fill="land.roof" />
+              <rect x="322" y="93" width="26" height="17" /><path d="M319 93 L335 84 L351 93Z" :fill="land.roof" />
+              <rect x="354" y="96" width="22" height="14" /><path d="M351 96 L365 88 L379 96Z" :fill="land.roof" />
+            </g>
+            <g :fill="land.church">
+              <rect x="268" y="70" width="10" height="40" /><path d="M267 71 L273 62 L279 71Z" :fill="sky === 'dia' ? land.roof : land.church" />
+              <rect x="272.4" y="55" width="1.4" height="8" /><rect x="270" y="57.4" width="6.2" height="1.4" />
+              <rect x="278" y="84" width="38" height="26" /><path d="M278 84 Q297 74 316 84Z" />
+            </g>
+            <g v-if="sky === 'dia'" fill="#5b4636" opacity="0.75">
+              <path d="M293 110 v-10 a4 4 0 0 1 8 0 v10z" /><rect x="244" y="101" width="5" height="9" rx="1" /><rect x="331" y="100" width="6" height="10" rx="1" />
+              <rect x="271" y="76" width="4" height="6" rx="2" />
+            </g>
+            <g v-if="sky === 'noche' || sky === 'atardecer'" fill="#F2B33D" opacity="0.8">
+              <rect x="271" y="76" width="4" height="5" rx="1" /><rect x="292" y="94" width="4" height="5" rx="1" /><rect x="331" y="99" width="4" height="4" rx="1" />
+            </g>
+            <rect width="408" height="110" fill="url(#sky-legible)" />
+          </svg>
+          <div class="relative z-[1] flex items-end gap-3">
             <div v-if="avatar" class="avatar-logo w-12 h-12 mb-1.5 rounded-full overflow-hidden shrink-0">
               <img :src="avatar" alt="" class="w-full h-full object-cover" />
             </div>
@@ -1036,8 +877,8 @@ const format = (text) => escapeHtml(text || '')
               </button>
             </div>
             <div class="flex-1 min-w-0 pb-2">
-              <p class="font-extrabold text-[17px] leading-tight tracking-tight truncate">{{ title }}</p>
-              <p class="text-[13px] text-white/60 truncate mt-0.5">
+              <p class="header-text font-extrabold text-[17px] leading-tight tracking-tight truncate">{{ title }}</p>
+              <p class="header-text text-[13px] text-white/75 truncate mt-0.5">
                 <Transition name="label" mode="out-in">
                   <span :key="statusText">{{ statusText }}</span>
                 </Transition>
@@ -1227,40 +1068,39 @@ const format = (text) => escapeHtml(text || '')
 .head-pop-enter-active { transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.08s, opacity 0.2s ease 0.08s; }
 .head-pop-enter-from { transform: scale(0.2) translateY(8px); opacity: 0; }
 
-/* Hilo de colores del que cuelga Chapi */
-.pendulum { transform-origin: 0 0; }
-.rope {
-  transform-origin: top;
-  background: repeating-linear-gradient(180deg, #C1121F 0 10px, #FDF0D5 10px 14px, #669BBC 14px 22px, #F2B33D 22px 26px);
-  border-radius: 2px;
-  box-shadow: 0 0 0 1px rgb(0 48 73 / 0.25);
-}
-
-/* Barrilete */
-.kite-rig { transform-origin: 60px 45px; }
-.kite { animation: kiteFlutter 0.7s ease-in-out infinite alternate; transform-origin: 50% 50%; }
-.kite-tail { transform-origin: 25px 80px; animation: tail 0.5s ease-in-out infinite alternate; }
-.kite-string { background: #FDF0D5; box-shadow: 0 0 0 0.5px rgb(0 48 73 / 0.4); }
-@keyframes kiteFlutter { from { transform: rotate(-3deg); } to { transform: rotate(3deg) scale(1.02); } }
-@keyframes tail { from { transform: rotate(-8deg); } to { transform: rotate(10deg); } }
-
-/* Volcán: la bolita tiembla y se pone al rojo vivo */
-.launcher-avatar.is-rumbling {
-  animation: rumble 0.08s linear infinite;
-  background: radial-gradient(circle at 50% 60%, #ffb347, #ff7a1a 45%, #C1121F 80%);
-  box-shadow: 0 0 0 3px rgb(255 122 26 / 0.45), 0 0 22px 6px rgb(255 90 0 / 0.55);
-}
-@keyframes rumble {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(-1.5px, 1px) rotate(-2deg); }
-  50% { transform: translate(1.5px, -1px); }
-  75% { transform: translate(-1px, -1px) rotate(2deg); }
+/* Chapi durante las escenas: lo mueve chapiScenes.js */
+.chapi-actor {
+  position: fixed; left: 0; top: 0; width: 58px; height: 72px; z-index: 201;
+  pointer-events: none; transform-origin: 50% 50%; will-change: transform, opacity; opacity: 0;
 }
 
 /* Tocar a Chapi en el encabezado */
 .chapi-poke { cursor: pointer; border-radius: 16px; transition: transform 0.2s ease; }
 .chapi-poke:hover { transform: translateY(-2px); }
 .chapi-poke:active { transform: scale(0.94); }
+
+/* Celular: sin zoom por doble toque ni sombreado al tocar botones del chat */
+.chat-root button, .chat-root a, .chat-root textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.chapi-poke, .launcher { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+
+/* Paisaje del encabezado */
+.header-text { text-shadow: 0 1px 3px rgb(0 30 50 / 0.55); }
+.sky-sun { animation: sunGlow 4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes sunGlow { 0%, 100% { transform: scale(1); opacity: 0.3; } 50% { transform: scale(1.12); opacity: 0.45; } }
+.sky-birds { animation: birds 9s ease-in-out infinite; }
+@keyframes birds { 0% { transform: translate(-20px, 4px); } 50% { transform: translate(30px, -3px); } 100% { transform: translate(-20px, 4px); } }
+.sky-cloud { animation: skyDrift 70s linear infinite; }
+@keyframes skyDrift { from { transform: translateX(-80px); } to { transform: translateX(460px); } }
+.sky-star { animation: twinkle 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes twinkle { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
+.sky-smoke { animation: skySmoke 3.2s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes skySmoke { 0% { opacity: 0; transform: translate(0, 0) scale(0.6); } 25% { opacity: 0.6; } 100% { opacity: 0; transform: translate(6px, -16px) scale(1.8); } }
+.sky-breath { animation: breath 6s ease-in-out infinite; }
+@keyframes breath { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+.textile { z-index: 1; }
 
 /* Scroll: el texto se mete y la bolita rueda como pelota */
 .launcher-label {
@@ -1309,11 +1149,7 @@ const format = (text) => escapeHtml(text || '')
 .panel-leave-to { opacity: 0; transform: translate(8px, 16px) scale(0.85); }
 
 /* Encabezado con luz suave desde la esquina de Chapi */
-.header {
-  background:
-    radial-gradient(120% 150% at 0% 0%, rgb(102 155 188 / 0.3), transparent 55%),
-    #003049;
-}
+.header { background: #003049; }
 .avatar-logo { box-shadow: 0 0 0 3px rgb(253 240 213 / 0.18), 0 6px 16px -6px rgb(0 0 0 / 0.45); }
 
 /* Franja bordada: zigzag crema, rombos azules y puntos amarillos sobre rojo */
@@ -1427,6 +1263,7 @@ const format = (text) => escapeHtml(text || '')
 button:focus-visible, a:focus-visible { outline: 2px solid #C1121F; outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
+  .sky-cloud, .sky-star, .sky-smoke, .sky-breath { animation: none !important; }
   .launcher-avatar, .msg-bot-in, .msg-user-in, .chip, .biz-card, .wa-card, .tip-card,
   .panel-enter-active .textile, .typing i { animation: none !important; }
   .panel-enter-active, .panel-leave-active, .launcher-enter-active, .launcher-leave-active,
