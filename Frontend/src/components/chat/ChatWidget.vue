@@ -97,7 +97,16 @@ const STATUS_TEXT = {
   dance: '¡A bailar!',
   love: 'Yo también te quiero',
   spin: '¡Wiii!',
-  dizzy: 'Me estás mareando…'
+  dizzy: 'Me estás mareando…',
+  bow: '¡Con mucho gusto!',
+  covered: '¡Te escucho, no grités!',
+  marimba: '¡Que suene la marimba!',
+  eating: '¡Qué rico se ve!',
+  knitting: 'Tejiendo ideas…',
+  coffee: 'Con cafecito todo sale mejor',
+  mirror: '¡Qué guapo me veo!',
+  map: 'Te marco la ruta',
+  send: '¡Mensaje en camino!'
 }
 
 // Cada toque provoca una reacción distinta; muchos toques seguidos lo marean
@@ -508,6 +517,221 @@ const saveHistory = () => {
 
 watch(storageKey, loadHistory, { immediate: true })
 
+// ── Mirada que sigue el cursor ─────────────────────────────
+const look = ref({ x: 0, y: 0 })
+const headerBot = ref(null)
+let pointerFrame = 0
+let lastPointer = null
+let lookResetTimer = null
+
+const setLookTowards = (clientX, clientY) => {
+  const el = isOpen.value ? headerBot.value : launcherAvatar.value
+  if (!el) return
+  const r = el.getBoundingClientRect()
+  const dx = clientX - (r.left + r.width / 2)
+  const dy = clientY - (r.top + r.height * (isOpen.value ? 0.4 : 0.5))
+  const dist = Math.hypot(dx, dy) || 1
+  const k = Math.min(1, dist / 160) * 2.6
+  look.value = { x: +(dx / dist * k).toFixed(2), y: +(dy / dist * k * 0.8).toFixed(2) }
+}
+
+const onPointerMove = (e) => {
+  activity()
+  lastPointer = e
+  if (pointerFrame) return
+  pointerFrame = requestAnimationFrame(() => {
+    pointerFrame = 0
+    if (lastPointer) setLookTowards(lastPointer.clientX, lastPointer.clientY)
+  })
+}
+
+// Mira un momento hacia arriba o hacia abajo (por ejemplo, al hacer scroll)
+const glance = (x, y, ms = 700) => {
+  look.value = { x, y }
+  clearTimeout(lookResetTimer)
+  lookResetTimer = setTimeout(() => { look.value = { x: 0, y: 0 } }, ms)
+}
+
+// ── Scroll: al bajar, el chat se esconde y el botón se enrolla en la bolita ──
+const collapsed = ref(false)
+const rolling = ref('')
+let lastScrollY = 0
+let scrollFrame = 0
+let rollTimer = null
+
+const roll = (direction) => {
+  rolling.value = direction
+  clearTimeout(rollTimer)
+  rollTimer = setTimeout(() => { rolling.value = '' }, 700)
+}
+
+const onScroll = () => {
+  activity()
+  if (scrollFrame) return
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0
+    const y = window.scrollY
+    const delta = y - lastScrollY
+    if (Math.abs(delta) < 6) return
+    lastScrollY = y
+    if (delta > 0 && y > 80) {
+      if (isOpen.value) close()
+      if (!collapsed.value) { collapsed.value = true; roll('in') }
+      glance(0, 2.4)
+    } else if (delta < 0) {
+      if (collapsed.value) { collapsed.value = false; roll('out') }
+      glance(0, -2.4)
+    }
+  })
+}
+
+// ── Estado de la cabeza de Chapi en la bolita ──────────────
+const launcherHeadState = ref('idle')
+const launcherHeadHidden = ref(false)
+const catching = ref(false)
+let launcherStateTimer = null
+
+const launcherReact = (state, ms = 2000) => {
+  clearTimeout(launcherStateTimer)
+  launcherHeadState.value = state
+  launcherStateTimer = setTimeout(() => { launcherHeadState.value = 'idle' }, ms)
+}
+const launcherBotState = computed(() => (introHeadState.value !== 'idle' ? introHeadState.value : launcherHeadState.value))
+const bounceLauncher = () => {
+  catching.value = true
+  setTimeout(() => { catching.value = false }, 650)
+}
+
+// ── Página sin actividad: bosteza ──────────────────────────
+let idleTimer = null
+let yawns = 0
+const activity = () => {
+  clearTimeout(idleTimer)
+  if (yawns >= 3) return
+  idleTimer = setTimeout(() => {
+    if (isOpen.value || introPhase.value !== 'done') return activity()
+    yawns++
+    launcherReact('yawn', 1900)
+    bounceLauncher()
+    activity()
+  }, 30000)
+}
+
+// ── Intención de salida: el cursor se va por arriba de la ventana ──
+const teaserText = ref('')
+const EXIT_KEY = 'chapi-exit'
+const onMouseOut = (e) => {
+  if (e.relatedTarget || e.clientY > 0 || isOpen.value || introPhase.value !== 'done') return
+  try { if (sessionStorage.getItem(EXIT_KEY) === '1') return; sessionStorage.setItem(EXIT_KEY, '1') } catch { /* sin storage */ }
+  teaserText.value = '¡Espera! ¿Te ayudo a encontrar algo antes de irte?'
+  showTeaser.value = true
+  launcherReact('surprised', 1600)
+  bounceLauncher()
+  clearTimeout(teaserTimer)
+  teaserTimer = setTimeout(() => { showTeaser.value = false }, 7000)
+}
+
+// ── Accesorios según la fecha y la hora de Guatemala ──────
+// Con ?chapi-tema=navidad|independencia|semanasanta|muertos|noche|manana se fuerza uno
+const easterSunday = (year) => {
+  const a = year % 19, b = Math.floor(year / 100), c = year % 100
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25)
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7
+  const m = Math.floor((a + 11 * h + 22 * l) / 451)
+  const month = Math.floor((h + l - 7 * m + 114) / 31)
+  const day = ((h + l - 7 * m + 114) % 31) + 1
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+const THEMES = {
+  navidad: { hat: 'santa' },
+  independencia: { hold: 'torch' },
+  semanasanta: { carpet: true },
+  muertos: { kite: true },
+  noche: { hat: 'nightcap', night: true },
+  manana: { hold: 'coffee' }
+}
+
+const accessory = computed(() => {
+  const forced = new URLSearchParams(window.location.search).get('chapi-tema')?.toLowerCase()
+  if (forced && THEMES[forced]) return THEMES[forced]
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Guatemala', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', hourCycle: 'h23'
+  }).formatToParts(new Date()).map(x => [x.type, Number(x.value)]))
+  const { year, month, day, hour } = parts
+  const today = Date.UTC(year, month - 1, day)
+  const easter = easterSunday(year).getTime()
+  if (month === 9 && (day === 14 || day === 15)) return THEMES.independencia
+  if (month === 12) return THEMES.navidad
+  if ((month === 10 && day === 31) || (month === 11 && day <= 2)) return THEMES.muertos
+  if (today >= easter - 7 * 86400000 && today <= easter) return THEMES.semanasanta
+  if (hour >= 19 || hour < 6) return THEMES.noche
+  if (hour >= 6 && hour < 10) return THEMES.manana
+  return {}
+})
+
+// ── Transición de Chapi entre la bolita y el encabezado ────
+const transit = ref({ on: false, style: {}, state: 'happy' })
+const transitEl = ref(null)
+const headerBotHidden = ref(false)
+const pause = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+const calmMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+const flyBetween = async (from, to, kind) => {
+  const box = kind === 'open' ? to : from
+  transit.value = {
+    on: true,
+    state: kind === 'open' ? 'happy' : 'wave',
+    style: { left: `${box.left}px`, top: `${box.top}px`, width: `${box.width}px`, height: `${box.height}px` }
+  }
+  await nextTick()
+  if (!transitEl.value) return
+  const dx = (kind === 'open' ? from : to).left + (kind === 'open' ? from : to).width / 2 - (box.left + box.width / 2)
+  const dy = (kind === 'open' ? from : to).top + (kind === 'open' ? from : to).height / 2 - (box.top + box.height / 2)
+  const frames = kind === 'open'
+    ? [
+        { transform: `translate(${dx}px, ${dy}px) scale(0.35)`, opacity: 0, easing: 'cubic-bezier(0.2, 0.7, 0.4, 1)' },
+        { transform: `translate(${dx * 0.45}px, ${dy * 0.45 - 90}px) rotate(-15deg) scale(0.85)`, opacity: 1, offset: 0.55, easing: 'cubic-bezier(0.5, 0, 0.7, 1)' },
+        { transform: 'translate(0px, 0px) rotate(0deg) scale(1)', opacity: 1 }
+      ]
+    : [
+        { transform: 'translate(0px, 0px) rotate(0deg) scale(1)', opacity: 1, easing: 'ease-out' },
+        { transform: 'translate(0px, -10px) rotate(0deg) scale(1)', opacity: 1, offset: 0.4, easing: 'cubic-bezier(0.55, 0, 0.85, 0.35)' },
+        { transform: `translate(${dx}px, ${dy}px) rotate(200deg) scale(0.3)`, opacity: 0 }
+      ]
+  try { await transitEl.value.animate(frames, { duration: kind === 'open' ? 750 : 1200, fill: 'forwards' }).finished } catch { /* cancelado */ }
+  transit.value = { on: false, style: {}, state: 'idle' }
+}
+
+// ── Palabras clave en el mensaje del usuario ───────────────
+const KEYWORDS = [
+  [/\b(hola|holi|buenas|buenos d[ií]as|buenas tardes|buenas noches|qu[eé] onda|saludos)\b/i, 'wave'],
+  [/\b(gracias|muchas gracias|te lo agradezco)\b/i, 'bow'],
+  [/\b(ja){2,}|\bjeje|\bxd\b|\blol\b|\bchiste\b/i, 'giggle'],
+  [/\bte (quiero|amo)\b/i, 'love']
+]
+const isShouting = (text) => /!{3,}/.test(text) || (/[A-ZÁÉÍÓÚÑ]{4,}/.test(text) && text === text.toUpperCase())
+const keywordReaction = (text) => {
+  if (isShouting(text)) return 'covered'
+  return KEYWORDS.find(([re]) => re.test(text))?.[1] || ''
+}
+
+// Reacción según la categoría del negocio que encontró
+const categoryReaction = (cards) => {
+  const cat = (cards?.[0]?.categoria || '').toLowerCase()
+  if (/caf[eé]/.test(cat)) return 'coffee'
+  if (/gastronom|comida|comedor|restaur|snack|panader|reposter|bebida|antoj/.test(cat)) return 'eating'
+  if (/artesan|tej|croch/.test(cat)) return 'knitting'
+  if (/belleza|est[eé]tica|bisuter|maquill|ropa|moda/.test(cat)) return 'mirror'
+  return 'happy'
+}
+
+const onCardClick = (businessId, tipo) => {
+  trackChatClick(businessId, tipo)
+  react(tipo === 'maps' ? 'map' : 'send', 2200)
+}
+
 // ── Abrir / cerrar ─────────────────────────────────────────
 const scrollToBottom = async () => {
   await nextTick()
@@ -516,20 +740,43 @@ const scrollToBottom = async () => {
 
 const open = async () => {
   if (introPhase.value !== 'done') finishIntro()
+  const from = launcherAvatar.value?.getBoundingClientRect()
+  const jump = !!from && !props.avatar && !calmMotion()
+  headerBotHidden.value = jump
   isOpen.value = true
+  collapsed.value = false
   dismissTeaser()
-  react('wave', 2400)
   wake()
   await nextTick()
   if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight
   // En celular no abrimos el teclado de golpe
   if (window.matchMedia('(min-width: 640px)').matches) textarea.value?.focus()
+  if (jump) {
+    // Chapi salta de la bolita al encabezado cuando el panel termina de abrir
+    await pause(430)
+    const to = headerBot.value?.getBoundingClientRect()
+    if (to && isOpen.value) await flyBetween(from, to, 'open')
+    headerBotHidden.value = false
+  }
+  react('wave', 2400)
 }
 
-const close = () => {
+const close = async () => {
+  if (!isOpen.value) return
+  const from = headerBot.value?.getBoundingClientRect()
+  const dive = !!from && !props.avatar && !calmMotion()
   isOpen.value = false
   clearTimeout(sleepTimer)
   sleeping.value = false
+  if (!dive) return
+  // Se despide con la mano y se clava de cabeza en la bolita
+  launcherHeadHidden.value = true
+  await nextTick()
+  await pause(150)
+  const to = launcherAvatar.value?.getBoundingClientRect()
+  if (to) await flyBetween(from, to, 'close')
+  launcherHeadHidden.value = false
+  bounceLauncher()
 }
 
 const onKeydown = (e) => { if (e.key === 'Escape' && isOpen.value) close() }
@@ -545,6 +792,11 @@ const dismissTeaser = () => {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('pointermove', onPointerMove, { passive: true })
+  window.addEventListener('scroll', onScroll, { passive: true })
+  document.addEventListener('mouseout', onMouseOut)
+  lastScrollY = window.scrollY
+  activity()
   if (hasIntro.value) {
     let seen = false
     try { seen = sessionStorage.getItem(INTRO_KEY) === '1' } catch { /* sin storage */ }
@@ -560,6 +812,15 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('pointermove', onPointerMove)
+  window.removeEventListener('scroll', onScroll)
+  document.removeEventListener('mouseout', onMouseOut)
+  cancelAnimationFrame(pointerFrame)
+  cancelAnimationFrame(scrollFrame)
+  clearTimeout(idleTimer)
+  clearTimeout(lookResetTimer)
+  clearTimeout(rollTimer)
+  clearTimeout(launcherStateTimer)
   clearTimeout(teaserTimer)
   clearInterval(typingTimer)
   clearTimeout(reactionTimer)
@@ -588,8 +849,8 @@ const autoGrow = () => {
   el.style.height = `${Math.min(el.scrollHeight, 120)}px`
 }
 
-const request = async () => {
-  reaction.value = ''
+const request = async ({ keepReaction = false } = {}) => {
+  if (!keepReaction) reaction.value = ''
   userTyping.value = false
   wake()
   loading.value = true
@@ -599,7 +860,9 @@ const request = async () => {
     const data = await sendChatMessage({ mode: props.mode, messages: history, businessId: props.businessId })
     const reply = data.reply || 'No tengo una respuesta para eso. ¿Lo puedes preguntar de otra forma?'
     messages.value.push({ role: 'assistant', content: reply, cards: data.cards || [], actions: data.actions || [], fresh: true })
-    if (data.cards?.length || data.actions?.length) react('happy', 2800)
+    if (data.actions?.some(a => a.type === 'whatsapp')) react('send', 2400)
+    else if (data.cards?.length) react(categoryReaction(data.cards), 3000)
+    else if (data.actions?.length) react('happy', 2800)
     else if (/no (encontr|tengo|hay|pude)|lo siento/i.test(reply)) react('confused', 3200)
   } catch (err) {
     const content = err.response?.status === 429
@@ -620,7 +883,19 @@ const send = async (text) => {
   input.value = ''
   nextTick(autoGrow)
   messages.value.push({ role: 'user', content, fresh: true })
-  await request()
+
+  // Código secreto: Chapi baila con marimba sin consultar a la IA
+  if (/^\s*chapi,?\s+baila\b/i.test(content)) {
+    messages.value.push({ role: 'assistant', content: '¡Que suene la marimba! ♪ Cuando quieras seguimos buscando negocios.', fresh: true })
+    saveHistory()
+    scrollToBottom()
+    react('marimba', 5000)
+    return
+  }
+
+  const kw = keywordReaction(content)
+  if (kw) react(kw, 1500)
+  await request({ keepReaction: !!kw })
 }
 
 const retry = async () => {
@@ -667,7 +942,7 @@ const format = (text) => escapeHtml(text || '')
         class="fixed bottom-[5.25rem] right-4 sm:right-6 z-[199] w-[min(18rem,calc(100vw-2rem))]">
         <button type="button" @click="open"
           class="teaser-bubble w-full text-left bg-white rounded-2xl rounded-br-md px-4 py-3 pr-9 text-sm text-fiery-navy">
-          {{ teaser }}
+          {{ teaserText || teaser }}
         </button>
         <button type="button" @click="dismissTeaser" aria-label="Cerrar mensaje"
           class="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-slate-400 hover:text-fiery-navy hover:bg-slate-100 transition-colors">
@@ -719,21 +994,26 @@ const format = (text) => escapeHtml(text || '')
       </div>
     </div>
 
+    <!-- Chapi saltando entre la bolita y el encabezado del chat -->
+    <div v-if="transit.on" ref="transitEl" class="fixed z-[202] pointer-events-none" :style="transit.style" aria-hidden="true">
+      <ChapiBot :state="transit.state" :accessory="accessory" />
+    </div>
+
     <!-- Botón flotante -->
     <Transition name="launcher">
       <button v-if="!isOpen" type="button" @click="open"
         class="launcher fixed bottom-5 right-4 sm:right-6 z-[200] flex items-center rounded-full bg-fiery-navy text-white"
-        :class="launcherText ? 'gap-3 pl-1.5 pr-5 py-1.5' : 'gap-0 p-1.5'"
+        :class="[launcherText && !collapsed ? 'gap-3 pl-1.5 pr-5 py-1.5' : 'gap-0 p-1.5', { 'is-collapsed': collapsed }]"
         :aria-label="`Abrir ${title}`">
         <span ref="launcherAvatar"
           class="launcher-avatar relative w-11 h-11 rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-fiery-red"
-          :class="{ 'is-catching': introPhase === 'landed', 'no-nudge': hasIntro, 'is-rumbling': rumbling }">
+          :class="{ 'is-catching': introPhase === 'landed' || catching, 'no-nudge': hasIntro, 'is-rumbling': rumbling, 'is-roll-in': rolling === 'in', 'is-roll-out': rolling === 'out' }">
           <img v-if="avatar" :src="avatar" alt="" class="w-full h-full object-cover" />
           <Transition v-else name="head-pop">
-            <span v-if="showLauncherHead" class="w-9 h-9 mt-1"><ChapiBot variant="head" :hero="masked" :unmask="unmasking" :state="introHeadState" /></span>
+            <span v-if="showLauncherHead && !launcherHeadHidden" class="w-9 h-9 mt-1"><ChapiBot variant="head" :hero="masked" :unmask="unmasking" :state="launcherBotState" :look="look" :accessory="accessory" /></span>
           </Transition>
         </span>
-        <span v-if="launcherText" class="text-sm font-bold whitespace-nowrap" aria-live="polite">
+        <span v-if="launcherText" class="launcher-label text-sm font-bold whitespace-nowrap" aria-live="polite">
           {{ launcherText }}<span v-if="typingCaret" class="caret" aria-hidden="true"></span>
         </span>
       </button>
@@ -750,9 +1030,9 @@ const format = (text) => escapeHtml(text || '')
             <div v-if="avatar" class="avatar-logo w-12 h-12 mb-1.5 rounded-full overflow-hidden shrink-0">
               <img :src="avatar" alt="" class="w-full h-full object-cover" />
             </div>
-            <div v-else class="w-[66px] h-[80px] -mb-[12px] -ml-1 shrink-0">
+            <div v-else ref="headerBot" class="w-[66px] h-[80px] -mb-[12px] -ml-1 shrink-0" :class="{ 'opacity-0': headerBotHidden }">
               <button type="button" @click="poke" class="chapi-poke block w-full h-full" aria-label="Tocar a Chapi">
-                <ChapiBot :state="botState" />
+                <ChapiBot :state="botState" :look="look" :accessory="accessory" />
               </button>
             </div>
             <div class="flex-1 min-w-0 pb-2">
@@ -844,13 +1124,13 @@ const format = (text) => escapeHtml(text || '')
                   </RouterLink>
                   <div class="flex gap-2 p-3.5 pt-3">
                     <a v-if="card.whatsapp" :href="card.whatsapp" target="_blank" rel="noopener"
-                      @click="trackChatClick(card.id, 'whatsapp')"
+                      @click="onCardClick(card.id, 'whatsapp')"
                       class="press flex-1 inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-green-700 hover:bg-green-800 text-white text-xs font-bold transition-colors">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/></svg>
                       WhatsApp
                     </a>
                     <a v-if="card.maps" :href="card.maps" target="_blank" rel="noopener"
-                      @click="trackChatClick(card.id, 'maps')" title="Cómo llegar" aria-label="Cómo llegar"
+                      @click="onCardClick(card.id, 'maps')" title="Cómo llegar" aria-label="Cómo llegar"
                       class="press inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-fiery-navy/[0.07] hover:bg-fiery-navy hover:text-white text-fiery-navy text-xs font-bold transition-colors"
                       :class="card.whatsapp ? 'w-10' : 'flex-1'">
                       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
@@ -865,7 +1145,7 @@ const format = (text) => escapeHtml(text || '')
                 <div v-if="a.type === 'whatsapp'" class="wa-card">
                   <p class="text-[11px] font-bold text-green-800 mb-2">Mensaje listo para enviar</p>
                   <p class="wa-draft">{{ a.preview }}</p>
-                  <a :href="a.url" target="_blank" rel="noopener" @click="trackChatClick(a.id_emprendimiento, 'whatsapp')"
+                  <a :href="a.url" target="_blank" rel="noopener" @click="onCardClick(a.id_emprendimiento, 'whatsapp')"
                     class="press mt-3 flex items-center justify-center gap-2 h-10 rounded-xl bg-green-700 hover:bg-green-800 text-white text-sm font-bold transition-colors">
                     Enviar por WhatsApp
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg>
@@ -981,6 +1261,17 @@ const format = (text) => escapeHtml(text || '')
 .chapi-poke { cursor: pointer; border-radius: 16px; transition: transform 0.2s ease; }
 .chapi-poke:hover { transform: translateY(-2px); }
 .chapi-poke:active { transform: scale(0.94); }
+
+/* Scroll: el texto se mete y la bolita rueda como pelota */
+.launcher-label {
+  display: inline-block; max-width: 260px; overflow: hidden; vertical-align: middle;
+  transition: max-width 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+}
+.launcher.is-collapsed .launcher-label { max-width: 0; opacity: 0; }
+.launcher-avatar.is-roll-in { animation: rollIn 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.launcher-avatar.is-roll-out { animation: rollOut 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes rollIn { 0% { transform: rotate(0) scale(1); } 60% { transform: rotate(-380deg) scale(1.12); } 100% { transform: rotate(-360deg) scale(1); } }
+@keyframes rollOut { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(200deg) translateY(-6px) scale(1.1); } 100% { transform: rotate(360deg) scale(1); } }
 
 /* Cursor de "escribiendo" dentro del botón */
 .caret {
