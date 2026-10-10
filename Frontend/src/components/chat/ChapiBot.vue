@@ -14,13 +14,30 @@ const props = defineProps({
   hero: { type: Boolean, default: false },
   // Se quita la máscara
   unmask: { type: Boolean, default: false },
-  animated: { type: Boolean, default: true }
+  animated: { type: Boolean, default: true },
+  // Hacia dónde mira (sigue el cursor): { x, y } en unidades del dibujo, máximo ±2.6
+  look: { type: Object, default: () => ({ x: 0, y: 0 }) },
+  // Accesorios según la fecha y la hora: { hat: 'santa'|'nightcap', hold: 'coffee'|'torch', kite, carpet, night }
+  accessory: { type: Object, default: () => ({}) }
 })
 
 const uid = `chapi-${Math.random().toString(36).slice(2, 8)}`
 
-const happyEyes = computed(() => ['happy', 'giggle', 'dance'].includes(props.state))
-const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love'].includes(props.state))
+const happyEyes = computed(() => ['happy', 'giggle', 'dance', 'marimba', 'eating', 'coffee', 'bow', 'send'].includes(props.state))
+const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'marimba', 'swinging', 'love', 'send'].includes(props.state))
+const closedEyes = computed(() => ['sleep', 'yawn'].includes(props.state))
+
+// Objeto que sostiene en la mano según el estado (o su accesorio cuando está tranquilo)
+const HOLD_BY_STATE = { thinking: 'lupa', eating: 'tortilla', knitting: 'yarn', coffee: 'coffee', mirror: 'mirror', map: 'map' }
+const HAND = { lupa: [80, 58], tortilla: [60, 60], yarn: [66, 80], coffee: [67, 73], mirror: [78, 57], map: [70, 66], torch: [82, 62] }
+const holdItem = computed(() => {
+  if (props.variant !== 'full') return null
+  if (HOLD_BY_STATE[props.state]) return HOLD_BY_STATE[props.state]
+  if (['idle', 'watching'].includes(props.state) && HAND[props.accessory?.hold]) return props.accessory.hold
+  return null
+})
+const hand = computed(() => HAND[holdItem.value] || [81.5, 90])
+const lookStyle = computed(() => ({ '--lx': `${props.look?.x || 0}px`, '--ly': `${props.look?.y || 0}px` }))
 </script>
 
 <template>
@@ -28,6 +45,7 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
     :viewBox="variant === 'head' ? '14 0 72 70' : '6 0 88 110'"
     class="chapi"
     :class="[`is-${state}`, { 'is-animated': animated }]"
+    :style="lookStyle"
     role="img" aria-label="Chapi, el robot asistente">
     <defs>
       <clipPath :id="`${uid}-head`"><rect x="22" y="18" width="56" height="44" rx="18" /></clipPath>
@@ -37,6 +55,16 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
         <stop offset="1" stop-color="#002233" />
       </linearGradient>
     </defs>
+
+    <!-- Alfombra de aserrín de Semana Santa -->
+    <g v-if="variant === 'full' && accessory.carpet" class="carpet">
+      <rect x="4" y="100" width="92" height="9" rx="2" fill="#5b2a86" />
+      <rect x="4" y="100" width="92" height="1.6" fill="#F2B33D" />
+      <rect x="4" y="107.4" width="92" height="1.6" fill="#F2B33D" />
+      <g fill="#FDF0D5"><circle cx="14" cy="104.5" r="1.6" /><circle cx="86" cy="104.5" r="1.6" /></g>
+      <g fill="#C1121F"><path d="M30 104.5 l3 -2.4 3 2.4 -3 2.4z" /><path d="M64 104.5 l3 -2.4 3 2.4 -3 2.4z" /></g>
+      <g fill="#3f9d5c"><circle cx="22" cy="104.5" r="1.2" /><circle cx="78" cy="104.5" r="1.2" /><circle cx="48" cy="104.5" r="1.2" /><circle cx="52" cy="104.5" r="1.2" /></g>
+    </g>
 
     <g class="posture">
       <g class="float">
@@ -75,7 +103,7 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
         </g>
 
         <!-- Brazo derecho -->
-        <g v-if="variant === 'full'" v-show="state !== 'swinging'" class="arm-wave">
+        <g v-if="variant === 'full'" v-show="state !== 'swinging' && !holdItem" class="arm-wave">
           <line x1="74" y1="70" x2="80.5" y2="87" stroke="#a50f1a" stroke-width="9" stroke-linecap="round" />
           <g v-if="carry">
             <path d="M78.6 94 v-2.4 a2.9 2.9 0 0 1 5.8 0 v2.4" fill="none" stroke="#4a2a14" stroke-width="1.8" />
@@ -89,7 +117,7 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
 
         <!-- Cabeza completa: se inclina según el estado -->
         <g class="head-group">
-          <g class="antenna-group">
+          <g v-if="!accessory.hat" class="antenna-group">
             <line x1="50" y1="19" x2="50" y2="10" stroke="#FDF0D5" stroke-width="2.8" stroke-linecap="round" />
             <circle class="antenna" cx="50" cy="7" r="4.2" fill="#C1121F" />
           </g>
@@ -111,6 +139,19 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
             <circle cx="24" cy="38.5" r="2.1" fill="#F2B33D" />
           </g>
 
+          <!-- Gorro navideño o gorrito de dormir -->
+          <g v-if="accessory.hat === 'santa'" class="hat">
+            <path d="M24 25 Q30 6 56 7 Q76 8 86 28 L80 30 Q72 16 56 15 Q36 15 30 26z" fill="#C1121F" />
+            <rect x="21" y="21" width="58" height="7.5" rx="3.75" fill="#FDF0D5" />
+            <circle cx="85" cy="31" r="4.2" fill="#FDF0D5" />
+          </g>
+          <g v-else-if="accessory.hat === 'nightcap'" class="hat">
+            <path d="M24 25 Q28 8 52 7 Q74 7 88 30 L82 32 Q72 16 54 15 Q36 15 30 26z" fill="#669BBC" />
+            <path d="M40 11 l4 13 M56 9 l1 14 M70 12 l-4 12" stroke="#FDF0D5" stroke-width="1.6" stroke-linecap="round" />
+            <rect x="21" y="21" width="58" height="7" rx="3.5" fill="#003049" />
+            <circle cx="87" cy="33" r="3.8" fill="#F2B33D" />
+          </g>
+
           <!-- Visor y cara -->
           <rect x="29" y="32" width="42" height="23" rx="11" :fill="`url(#${uid}-visor)`" />
           <g v-if="hero" class="mask" :class="{ 'is-off': unmask }">
@@ -125,6 +166,7 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
             <ellipse cx="59" cy="42.6" rx="7.8" ry="6.6" fill="#062a3f" stroke="#FDF0D5" stroke-width="1.8" />
             <ellipse cx="50" cy="51.2" rx="5.6" ry="3.2" fill="#062a3f" />
           </g>
+          <g class="eye-look">
           <g class="eye-pos">
             <!-- Feliz: ojitos ^ ^ -->
             <g v-if="happyEyes" fill="none" stroke="#9fd6f7" stroke-width="2.4" stroke-linecap="round">
@@ -146,7 +188,10 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
               <circle cx="42.6" cy="39.6" r="1.3" fill="#fff" /><circle cx="60.6" cy="39.6" r="1.3" fill="#fff" />
             </g>
             <!-- Dormido: ojos cerrados -->
-            <g v-else-if="state === 'sleep'" fill="none" stroke="#9fd6f7" stroke-width="2" stroke-linecap="round">
+            <g v-else-if="state === 'covered'" fill="none" stroke="#9fd6f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M38 39.5 l5 3 -5 3" /><path d="M62 39.5 l-5 3 5 3" />
+            </g>
+            <g v-else-if="closedEyes" fill="none" stroke="#9fd6f7" stroke-width="2" stroke-linecap="round">
               <path d="M37.8 43 q3.2 2.6 6.4 0" /><path d="M55.8 43 q3.2 2.6 6.4 0" />
             </g>
             <!-- Normal, triste y confundido -->
@@ -164,10 +209,13 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
               <line x1="37.5" y1="36.4" x2="44" y2="35.4" /><line x1="56" y1="34.4" x2="62.5" y2="35.8" />
             </g>
           </g>
+          </g>
 
           <!-- Boca -->
           <path v-if="bigSmile" d="M44.6 48.6 Q50 54.6 55.4 48.6 Z" fill="#9fd6f7" />
           <ellipse v-else-if="state === 'surprised'" cx="50" cy="51" rx="2.4" ry="2.9" fill="#9fd6f7" />
+          <ellipse v-else-if="state === 'yawn'" class="yawn-mouth" cx="50" cy="50.4" rx="3.2" ry="3.8" fill="#9fd6f7" />
+          <path v-else-if="state === 'covered'" d="M45.5 51 q1.5 -1.6 3 0 t3 0 t3 0" fill="none" stroke="#9fd6f7" stroke-width="1.6" stroke-linecap="round" />
           <path v-else-if="state === 'dizzy'" d="M45.5 51 q1.5 -1.6 3 0 t3 0 t3 0" fill="none" stroke="#9fd6f7" stroke-width="1.6" stroke-linecap="round" />
           <path v-else-if="state === 'sad'" d="M45.5 52 Q50 48.8 54.5 52" fill="none" stroke="#9fd6f7" stroke-width="1.8" stroke-linecap="round" />
           <path v-else-if="state === 'confused'" d="M45.8 50.6 q2.1 -1.6 4.2 0 t4.2 0" fill="none" stroke="#9fd6f7" stroke-width="1.7" stroke-linecap="round" />
@@ -176,6 +224,56 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
           <ellipse v-else-if="state === 'running'" cx="50" cy="50.6" rx="2.6" ry="2.1" fill="#9fd6f7" />
           <path v-else d="M45.5 49.6 Q50 52.8 54.5 49.6" fill="none" stroke="#9fd6f7" stroke-width="1.8" stroke-linecap="round" />
         </g>
+        <!-- Objeto en la mano: lupa, tortilla, tejido, café, espejo, mapa o antorcha -->
+        <g v-if="holdItem" class="hold" :class="`hold-${holdItem}`">
+          <line x1="72" y1="69" :x2="hand[0]" :y2="hand[1]" stroke="#a50f1a" stroke-width="9" stroke-linecap="round" />
+          <g v-if="holdItem === 'lupa'">
+            <line x1="80" y1="58" x2="84" y2="51" stroke="#4a2a14" stroke-width="2.6" stroke-linecap="round" />
+            <circle cx="86.5" cy="46" r="6" fill="#9fd6f7" fill-opacity="0.35" stroke="#F2B33D" stroke-width="2.2" />
+            <path d="M83.4 43.6 q1.8 -2 4.4 -1.2" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" />
+          </g>
+          <g v-else-if="holdItem === 'tortilla'" class="item-tortilla">
+            <ellipse cx="56" cy="55" rx="8" ry="7" fill="#f2d58c" stroke="#d6a94e" stroke-width="1" />
+            <g fill="#c98f3a"><circle cx="53" cy="53" r="0.9" /><circle cx="58.5" cy="57.5" r="0.9" /><circle cx="57" cy="51.5" r="0.8" /><circle cx="52.5" cy="58" r="0.7" /></g>
+          </g>
+          <g v-else-if="holdItem === 'yarn'">
+            <path d="M84 96 Q76 92 68 82" fill="none" stroke="#C1121F" stroke-width="1" />
+            <circle cx="84" cy="97" r="6" fill="#C1121F" />
+            <path d="M79 94 q5 3 10 0 M79.5 99 q5 -3 9.5 1" fill="none" stroke="#780000" stroke-width="1" />
+            <g class="needles" stroke="#F2B33D" stroke-width="1.6" stroke-linecap="round">
+              <line x1="61" y1="73" x2="71" y2="86" /><line x1="71" y1="73" x2="61" y2="86" />
+            </g>
+          </g>
+          <g v-else-if="holdItem === 'coffee'">
+            <rect x="61" y="66" width="12" height="10" rx="2.4" fill="#FDF0D5" />
+            <rect x="61" y="66" width="12" height="2.4" rx="1.2" fill="#6b3d1f" />
+            <path d="M73 68.5 q4 0.5 0 5" fill="none" stroke="#FDF0D5" stroke-width="1.8" />
+            <rect x="61" y="70.5" width="12" height="1.4" fill="#C1121F" />
+            <g class="steam" fill="none" stroke="#FDF0D5" stroke-width="1.3" stroke-linecap="round" opacity="0.8">
+              <path d="M64.5 63 q-1.5 -2.5 0 -5 t0 -5" /><path d="M69 63 q-1.5 -2.5 0 -5 t0 -5" />
+            </g>
+          </g>
+          <g v-else-if="holdItem === 'mirror'">
+            <line x1="78" y1="57" x2="80" y2="53" stroke="#F2B33D" stroke-width="2.4" stroke-linecap="round" />
+            <circle cx="82" cy="47" r="6.5" fill="#cfeaff" stroke="#F2B33D" stroke-width="2" />
+            <path d="M79 45 q1.5 -2.4 4 -2.4" fill="none" stroke="#fff" stroke-width="1.2" stroke-linecap="round" />
+          </g>
+          <g v-else-if="holdItem === 'map'">
+            <path d="M60 56 l7 -2 6 2 7 -2 v14 l-7 2 -6 -2 -7 2z" fill="#FDF0D5" stroke="#c9b48a" stroke-width="0.8" />
+            <path d="M67 54 v14 M73 56 v14" stroke="#c9b48a" stroke-width="0.8" />
+            <path d="M62 66 q4 -6 8 -3 t8 -5" fill="none" stroke="#669BBC" stroke-width="1.2" stroke-dasharray="1.6 1.2" />
+            <path d="M75 57.5 a2.2 2.2 0 1 1 0.01 0 M75 59.7 v2.6" fill="#C1121F" stroke="#C1121F" stroke-width="1.2" />
+          </g>
+          <g v-else-if="holdItem === 'torch'">
+            <line x1="82" y1="64" x2="82" y2="48" stroke="#7a4a24" stroke-width="3" stroke-linecap="round" />
+            <rect x="80.2" y="52" width="3.6" height="2" fill="#4997D0" /><rect x="80.2" y="54" width="3.6" height="2" fill="#FDF0D5" /><rect x="80.2" y="56" width="3.6" height="2" fill="#4997D0" />
+            <path d="M78.5 47 h7 l-1.4 3 h-4.2z" fill="#F2B33D" />
+            <path class="flame" d="M82 33 q5 6 2.6 11 q-2.6 3 -5.2 0 q-2.4 -5 2.6 -11z" fill="#ff7a1a" />
+            <path class="flame" d="M82 37 q3 4 1.4 7 q-1.4 1.8 -2.8 0 q-1.4 -3 1.4 -7z" fill="#F2B33D" />
+          </g>
+          <circle :cx="hand[0]" :cy="hand[1]" r="4.8" fill="#FDF0D5" />
+        </g>
+
         <!-- Brazo levantado que sujeta el hilo al columpiarse -->
         <g v-if="variant === 'full' && state === 'swinging'">
           <line x1="72" y1="69" x2="84" y2="41" stroke="#a50f1a" stroke-width="9" stroke-linecap="round" />
@@ -186,10 +284,28 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
 
     <!-- Efectos según el estado (solo cuerpo completo) -->
     <template v-if="variant === 'full' && animated">
-      <g v-if="state === 'thinking'" class="fx-think" fill="#FDF0D5">
-        <circle cx="74" cy="15" r="1.6" /><circle cx="79.5" cy="9.5" r="2.3" /><circle cx="87" cy="3.5" r="3.4" />
+      <g v-if="state === 'dance' || state === 'marimba'" class="fx-notes fx-notes-extra" fill="#F2B33D" font-family="Outfit, sans-serif" font-weight="800">
+        <text x="86" y="44" font-size="8">♪</text>
+        <text x="4" y="40" font-size="10">♫</text>
       </g>
-      <g v-if="state === 'happy'" class="fx-sparkle" fill="#F2B33D">
+      <path v-if="state === 'send'" class="fx-plane" d="M70 34 l18 -7 -6 16 -4 -6z M78 37 l4 -10" fill="#FDF0D5" stroke="#003049" stroke-width="0.6" stroke-linejoin="round" />
+      <g v-if="state === 'covered'" class="fx-shout" stroke="#F2B33D" stroke-width="1.6" stroke-linecap="round">
+        <line x1="8" y1="30" x2="13" y2="33" /><line x1="7" y1="40" x2="13" y2="40" /><line x1="92" y1="30" x2="87" y2="33" /><line x1="93" y1="40" x2="87" y2="40" />
+      </g>
+      <g v-if="accessory.night && ['idle', 'watching', 'sleep', 'yawn'].includes(state)" class="fx-night">
+        <path d="M14 6 a7 7 0 1 0 7 10 a5.5 5.5 0 1 1 -7 -10z" fill="#FDF0D5" />
+        <g fill="#F2B33D"><circle cx="26" cy="8" r="1" /><circle cx="8" cy="24" r="0.9" /><circle cx="90" cy="12" r="1" /></g>
+      </g>
+      <g v-if="accessory.kite && ['idle', 'watching', 'wave'].includes(state)" class="fx-kite">
+        <path d="M81.5 88 Q96 60 92 20" fill="none" stroke="#FDF0D5" stroke-width="0.7" />
+        <g class="mini-kite">
+          <circle cx="92" cy="14" r="8.5" fill="none" stroke="#F2B33D" stroke-width="2.4" stroke-dasharray="2 2" />
+          <path d="M92 14 L92 6 A8 8 0 0 1 100 14z" fill="#C1121F" /><path d="M92 14 L100 14 A8 8 0 0 1 92 22z" fill="#669BBC" />
+          <path d="M92 14 L92 22 A8 8 0 0 1 84 14z" fill="#F2B33D" /><path d="M92 14 L84 14 A8 8 0 0 1 92 6z" fill="#003049" />
+          <circle cx="92" cy="14" r="2.4" fill="#FDF0D5" />
+        </g>
+      </g>
+      <g v-if="state === 'happy' || state === 'bow'" class="fx-sparkle" fill="#F2B33D">
         <path d="M16 12 l1.4 3.6 3.6 1.4 -3.6 1.4 -1.4 3.6 -1.4 -3.6 -3.6 -1.4 3.6 -1.4z" />
         <path d="M84 6 l1.1 2.9 2.9 1.1 -2.9 1.1 -1.1 2.9 -1.1 -2.9 -2.9 -1.1 2.9 -1.1z" />
         <path d="M88 30 l0.9 2.3 2.3 0.9 -2.3 0.9 -0.9 2.3 -0.9 -2.3 -2.3 -0.9 2.3 -0.9z" />
@@ -206,7 +322,7 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
         <text x="76" y="18" font-size="9">ja</text>
         <text x="10" y="24" font-size="7">ja</text>
       </g>
-      <g v-if="state === 'dance'" class="fx-notes" fill="#FDF0D5" font-family="Outfit, sans-serif" font-weight="800">
+      <g v-if="state === 'dance' || state === 'marimba'" class="fx-notes" fill="#FDF0D5" font-family="Outfit, sans-serif" font-weight="800">
         <text x="78" y="20" font-size="11">♪</text>
         <text x="12" y="16" font-size="9">♫</text>
       </g>
@@ -342,6 +458,52 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
 .fx-ja text:nth-child(2), .fx-notes text:nth-child(2) { animation-delay: 0.5s; }
 .fx-bang { transform-origin: center; animation: bang 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
+/* ── Mirada que sigue el cursor ─────────────── */
+.eye-look { transform: translate(var(--lx, 0px), var(--ly, 0px)); transition: transform 0.18s ease-out; }
+
+/* ── Objetos en la mano ───────────────────────── */
+.hold { transform-box: view-box; transform-origin: 72px 69px; }
+.is-animated .hold-lupa { animation: sweep 1.1s ease-in-out infinite alternate; }
+.is-animated .hold-tortilla { animation: chew 0.42s ease-in-out infinite alternate; }
+.is-animated .hold-coffee { animation: sip 2.2s ease-in-out infinite; }
+.is-animated .hold-mirror { animation: sweep 1.6s ease-in-out infinite alternate; }
+.needles { transform-box: view-box; transform-origin: 66px 80px; }
+.is-animated .needles { animation: knit 0.35s ease-in-out infinite alternate; }
+.steam path { animation: steam 1.8s ease-out infinite both; }
+.steam path:nth-child(2) { animation-delay: 0.6s; }
+.flame { transform-box: fill-box; transform-origin: 50% 100%; animation: flicker 0.25s ease-in-out infinite alternate; }
+.is-thinking .eye-pos { transform: translate(2.4px, 0.6px); }
+.is-knitting .eye-pos, .is-map .eye-pos { transform: translate(1px, 2.6px); }
+.is-mirror .eye-pos { transform: translate(2.6px, 0.4px); }
+.is-eating .head-group { transform: rotate(-3deg); }
+
+/* ── Reverencia, tapándose los oídos, bostezo, avioncito, marimba ── */
+.is-bow .posture { transform: scaleY(0.97); }
+.is-bow .head-group { transform: translateY(6px) rotate(2deg); }
+.is-bow .arm-left { transform: rotate(-60deg); }
+.is-bow .arm-wave { transform: rotate(-12deg); }
+.is-covered .arm-left { transform: rotate(158deg); }
+.is-covered .arm-wave { transform: rotate(-158deg); }
+.is-animated.is-covered .posture { animation: giggle 0.12s linear 8; }
+.is-yawn .head-group { transform: rotate(-6deg) translateY(-1px); }
+.is-yawn .arm-left { transform: rotate(150deg); }
+.is-yawn .arm-wave { transform: rotate(-150deg); }
+.is-animated .yawn-mouth { transform-box: fill-box; transform-origin: center; animation: yawn 1.6s ease-in-out both; }
+.is-send .arm-wave { transform: rotate(-125deg); }
+.fx-plane { animation: plane 1.3s cubic-bezier(0.3, 0, 0.6, 1) both; }
+.is-animated.is-marimba .posture { animation: danceSway 0.3s ease-in-out infinite alternate; }
+.is-animated.is-marimba .arm-left { animation: danceL 0.3s ease-in-out infinite alternate; }
+.is-animated.is-marimba .arm-wave { animation: danceR 0.3s ease-in-out infinite alternate; }
+.is-animated.is-marimba .head-group { animation: danceHead 0.3s ease-in-out infinite alternate; }
+.fx-notes-extra text { animation: floatUp 1s ease-out infinite both; }
+.fx-notes-extra text:nth-child(2) { animation-delay: 0.45s; }
+.fx-shout line { animation: shout 0.4s ease-out infinite alternate; }
+
+/* ── Accesorios de fecha y hora ───────────────── */
+.mini-kite { transform-box: view-box; transform-origin: 92px 20px; }
+.is-animated .mini-kite { animation: kiteBob 1.4s ease-in-out infinite alternate; }
+.fx-night path { animation: none; }
+
 /* ── Dormido ──────────────────────────────────── */
 .is-sleep .posture { transform: translateY(3px); }
 .is-sleep .head-group { transform: rotate(7deg) translateY(2px); }
@@ -403,6 +565,16 @@ const bigSmile = computed(() => ['happy', 'giggle', 'dance', 'swinging', 'love']
 @keyframes orbit { to { transform: rotate(360deg); } }
 @keyframes floatUp { 0% { opacity: 0; transform: translateY(4px) scale(0.6); } 30% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-10px) scale(0.9); } }
 @keyframes bang { from { opacity: 0; transform: scale(0.2) rotate(-20deg); } to { opacity: 1; transform: scale(1) rotate(8deg); } }
+@keyframes sweep { from { transform: rotate(-10deg); } to { transform: rotate(12deg); } }
+@keyframes chew { from { transform: translateY(0); } to { transform: translateY(1.6px); } }
+@keyframes sip { 0%, 60%, 100% { transform: rotate(0); } 75% { transform: rotate(-18deg); } }
+@keyframes knit { from { transform: rotate(-12deg); } to { transform: rotate(12deg); } }
+@keyframes steam { 0% { opacity: 0; transform: translateY(2px); } 30% { opacity: 0.8; } 100% { opacity: 0; transform: translateY(-5px); } }
+@keyframes flicker { from { transform: scale(1, 1) rotate(-3deg); } to { transform: scale(0.9, 1.12) rotate(3deg); } }
+@keyframes yawn { 0% { transform: scale(0.4); } 40%, 70% { transform: scale(1.25); } 100% { transform: scale(0.5); } }
+@keyframes plane { 0% { opacity: 0; transform: translate(-6px, 6px) scale(0.6); } 20% { opacity: 1; } 100% { opacity: 0; transform: translate(40px, -40px) scale(1) rotate(-10deg); } }
+@keyframes shout { from { opacity: 0.3; } to { opacity: 1; } }
+@keyframes kiteBob { from { transform: rotate(-8deg) translateY(0); } to { transform: rotate(8deg) translateY(-2px); } }
 @keyframes zzz { 0% { opacity: 0; transform: translate(0, 4px); } 30% { opacity: 1; } 100% { opacity: 0; transform: translate(4px, -6px); } }
 
 @media (prefers-reduced-motion: reduce) {

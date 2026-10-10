@@ -10,6 +10,19 @@ const MAX_TOOL_ROUNDS = 5;
 const MAX_HISTORY = 12;
 const MAX_MESSAGE_CHARS = 1000;
 
+// Quita enlaces, URLs y números de teléfono que el modelo pudiera escribir: los datos de contacto
+// solo se muestran en los botones, que el servidor arma con lo registrado en la base de datos
+const cleanReply = (text) => text
+  .replace(/\[([^\]]+)\]\((?:https?:\/\/|www\.)[^)]*\)/gi, '$1')
+  .replace(/\(?(?:https?:\/\/|www\.)[^\s)]+\)?/gi, '')
+  .replace(/\(?n[uú]mero ficticio\)?/gi, '')
+  .replace(/(?:\+?502[\s-]?)?\b\d{4}[\s-]?\d{4}\b/g, '')
+  .replace(/[ \t]+([.,;:!?])/g, '$1')
+  .replace(/[ \t]{2,}/g, ' ')
+  .replace(/^[ \t]*[-•*][ \t]*$/gm, '')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim()
+
 // Solo aceptamos turnos user/assistant de texto desde el cliente
 const sanitizeHistory = (messages) => (Array.isArray(messages) ? messages : [])
   .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
@@ -50,7 +63,7 @@ async function runChat({ mode: modeName, messages, idEmprendimiento, user }) {
 
     const msg = response.choices[0].message;
     if (!msg.tool_calls || msg.tool_calls.length === 0) {
-      const reply = (msg.content || '').trim();
+      const reply = cleanReply(msg.content || '');
       if (mode.finalize) await mode.finalize(reply, state, ctx);
       return { reply, cards: state.cards, actions: state.actions };
     }
