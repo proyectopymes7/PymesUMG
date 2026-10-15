@@ -67,7 +67,7 @@ jobs:
 
       - name: Guardar reporte
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sast-semgrep-report
           path: |
@@ -145,7 +145,7 @@ jobs:
 
       - name: Guardar reporte
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sca-npm-audit-${{ matrix.project }}
           path: ${{ matrix.project }}/npm-audit.json
@@ -241,7 +241,7 @@ jobs:
 
       - name: Guardar reporte
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: secrets-gitleaks-report
           path: |
