@@ -19,7 +19,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",
-    "@azure/storage-blob": "^12.31.0",
+    "@azure/storage-blob": "^12.34.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -29,13 +29,13 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "mssql": "^10.0.2",
-    "multer": "^2.1.1",
-    "nodemailer": "^10.0.13",
+    "multer": "^2.5.0",
+    "nodemailer": "^10.2.1",
     "openai": "^6.39.1",
     "rate-limiter-flexible": "^4.0.1",
     "sharp": "^0.35.5",
     "tedious": "^16.6.1",
-    "uuid": "^14.0.0",
+    "uuid": "^14.0.3",
     "winston": "^3.11.0"
   },
   "devDependencies": {
