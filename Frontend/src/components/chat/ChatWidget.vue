@@ -356,6 +356,13 @@ const roll = (direction) => {
   rollTimer = setTimeout(() => { rolling.value = '' }, 700)
 }
 
+// El chat abierto solo se cierra por scroll en computadora con mouse y si no se está escribiendo.
+// En pantallas táctiles (celular o tablet, vertical u horizontal) el teclado desplaza la página
+// al tocar la caja de texto, y ese desplazamiento no debe cerrar el chat.
+const canCloseOnScroll = () =>
+  window.matchMedia('(min-width: 640px) and (hover: hover) and (pointer: fine)').matches &&
+  document.activeElement !== textarea.value
+
 const onScroll = () => {
   activity()
   if (scrollFrame) return
@@ -365,6 +372,7 @@ const onScroll = () => {
     const delta = y - lastScrollY
     if (Math.abs(delta) < 6) return
     lastScrollY = y
+    if (isOpen.value && !canCloseOnScroll()) return
     if (delta > 0 && y > 80) {
       if (isOpen.value) close()
       if (!collapsed.value) { collapsed.value = true; roll('in') }
