@@ -31,7 +31,7 @@
     "mssql": "^10.0.2",
     "multer": "^2.1.1",
     "nodemailer": "^10.0.13",
-    "openai": "^6.39.1",
+    "openai": "^7.23.0",
     "rate-limiter-flexible": "^4.0.1",
     "sharp": "^0.35.5",
     "tedious": "^16.6.1",
