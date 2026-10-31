@@ -614,6 +614,35 @@ const close = async () => {
 
 const onKeydown = (e) => { if (e.key === 'Escape' && isOpen.value) close() }
 
+// ── Celular: el panel ocupa solo el área visible sobre el teclado ──
+// En iPhone el teclado no achica la ventana: desplaza la vista hacia arriba. Sin esto el encabezado
+// se sale por arriba y la página asoma entre la caja de texto y el teclado.
+const panelStyle = ref({})
+const isPhone = () => !window.matchMedia('(min-width: 640px)').matches
+
+const fitPanel = () => {
+  const vv = window.visualViewport
+  if (!isOpen.value || !vv || !isPhone()) { panelStyle.value = {}; return }
+  const wasAtBottom = scroller.value
+    ? scroller.value.scrollHeight - scroller.value.scrollTop - scroller.value.clientHeight < 40
+    : false
+  panelStyle.value = { top: `${vv.offsetTop}px`, height: `${vv.height}px`, bottom: 'auto' }
+  // Si se estaba viendo el último mensaje, se sigue viendo al aparecer el teclado
+  if (wasAtBottom) nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight })
+}
+
+// Mientras el chat está abierto en celular, la página de fondo no se desplaza
+const lockPageScroll = (lock) => {
+  const value = lock && isPhone() ? 'hidden' : ''
+  document.documentElement.style.overflow = value
+  document.body.style.overflow = value
+}
+
+watch(isOpen, (open) => {
+  lockPageScroll(open)
+  nextTick(fitPanel)
+})
+
 // ── Burbuja de bienvenida (una vez por sesión) ─────────────
 const teaserKey = computed(() => `chat-teaser:${props.mode}`)
 
@@ -628,6 +657,8 @@ onMounted(() => {
   window.addEventListener('pointermove', onPointerMove, { passive: true })
   window.addEventListener('scroll', onScroll, { passive: true })
   document.addEventListener('mouseout', onMouseOut)
+  window.visualViewport?.addEventListener('resize', fitPanel)
+  window.visualViewport?.addEventListener('scroll', fitPanel)
   lastScrollY = window.scrollY
   activity()
   if (hasIntro.value) {
@@ -648,6 +679,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('pointermove', onPointerMove)
   window.removeEventListener('scroll', onScroll)
   document.removeEventListener('mouseout', onMouseOut)
+  window.visualViewport?.removeEventListener('resize', fitPanel)
+  window.visualViewport?.removeEventListener('scroll', fitPanel)
+  lockPageScroll(false)
   cancelAnimationFrame(pointerFrame)
   cancelAnimationFrame(scrollFrame)
   clearTimeout(idleTimer)
@@ -816,7 +850,7 @@ const format = (text) => escapeHtml(text || '')
 
     <!-- Panel -->
     <Transition name="panel">
-      <section v-if="isOpen" role="dialog" :aria-label="title"
+      <section v-if="isOpen" role="dialog" :aria-label="title" :style="panelStyle"
         class="panel fixed z-[200] inset-0 sm:inset-auto sm:right-6 sm:bottom-6 sm:w-[408px] sm:h-[min(660px,calc(100dvh-3rem))] flex flex-col bg-fiery-navy sm:rounded-[28px] overflow-hidden">
 
         <!-- Encabezado -->
